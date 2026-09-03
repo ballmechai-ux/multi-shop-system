@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ระบบร้านค้า - เข้าสู่ระบบ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    color:var(--text); padding:20px;
+  }
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:32px 26px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.4);
+  }
+  h1{ font-family:'Kanit',sans-serif; font-size:22px; text-align:center; margin-bottom:4px; }
+  .sub{ text-align:center; color:var(--sub); font-size:13px; margin-bottom:24px; }
+  .avatar-row{ display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; margin-bottom:18px; }
+  .avatar-row::-webkit-scrollbar{ display:none; }
+  .avatar{
+    flex:0 0 auto; width:64px; text-align:center; cursor:pointer; opacity:.6; transition:.15s;
+  }
+  .avatar.active{ opacity:1; }
+  .avatar .circle{
+    width:52px; height:52px; border-radius:50%; background:var(--accent);
+    display:flex; align-items:center; justify-content:center; font-family:'Kanit';
+    font-size:20px; font-weight:600; margin:0 auto 4px; border:2px solid transparent;
+  }
+  .avatar.active .circle{ border-color:#fff; }
+  .avatar .name{ font-size:11px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .avatar.active .name{ color:var(--text); }
+  .pin-display{
+    display:flex; justify-content:center; gap:12px; margin:20px 0;
+  }
+  .pin-dot{
+    width:16px; height:16px; border-radius:50%; border:2px solid var(--border); transition:.15s;
+  }
+  .pin-dot.filled{ background:var(--accent); border-color:var(--accent); }
+  .keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .key{
+    background:#0f172a; border:1px solid var(--border); border-radius:14px;
+    font-family:'Kanit'; font-size:22px; padding:16px 0; text-align:center;
+    color:var(--text); cursor:pointer; user-select:none; transition:.1s;
+  }
+  .key:active{ background:var(--accent); transform:scale(.96); }
+  .key.ghost{ background:transparent; border:none; }
+  .msg{ text-align:center; font-size:13px; min-height:20px; margin-top:14px; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+  .loading{ text-align:center; color:var(--sub); padding:40px 0; font-size:14px; }
+  .setup-box input{
+    width:100%; padding:13px 14px; margin-bottom:12px; border-radius:12px;
+    border:1px solid var(--border); background:#0f172a; color:var(--text); font-size:15px;
+    font-family:'Sarabun';
+  }
+  .setup-box label{ font-size:13px; color:var(--sub); display:block; margin-bottom:6px; }
+  .btn{
+    width:100%; padding:14px; border:none; border-radius:12px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:16px; font-weight:500; cursor:pointer; margin-top:6px;
+  }
+  .btn:active{ background:var(--accent2); }
+  .setup-title{ font-family:'Kanit'; font-size:18px; text-align:center; margin-bottom:4px; }
+  .setup-sub{ text-align:center; color:var(--sub); font-size:12.5px; margin-bottom:20px; line-height:1.5; }
+  .role-badge{
+    display:inline-block; font-size:10px; padding:2px 8px; border-radius:20px; margin-left:6px;
+    font-family:'Kanit'; vertical-align:middle;
+  }
+  .role-admin{ background:#7c3aed44; color:#c4b5fd; }
+  .role-owner{ background:#2563eb44; color:#93c5fd; }
+  .role-staff{ background:#0d948844; color:#5eead4; }
+  .success-screen{ text-align:center; }
+  .success-icon{ font-size:48px; margin-bottom:10px; }
+  .info-line{ font-size:13px; color:var(--sub); margin-top:4px; }
+  .info-box{
+    background:#0f172a; border:1px solid var(--border); border-radius:12px;
+    padding:14px; margin:18px 0; text-align:left; font-size:13px;
+  }
+  .info-box div{ padding:3px 0; }
+  .info-box b{ color:var(--text); }
+  .logout-btn{
+    margin-top:16px; background:transparent; border:1px solid var(--border);
+    color:var(--sub); padding:10px; border-radius:10px; width:100%; font-family:'Sarabun'; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="card" id="app">
+  <div class="loading" id="loading">กำลังเชื่อมต่อระบบ...</div>
+</div>
+
+<script>
+// ---------- Firebase config ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const app = document.getElementById('app');
+let currentPin = '';
+let selectedUser = null;
+let usersCache = {};
+
+// ---------- Boot: check if any users exist ----------
+db.ref('users').once('value').then(snap => {
+  usersCache = snap.val() || {};
+  const userIds = Object.keys(usersCache);
+  if(userIds.length === 0){
+    renderFirstAdminSetup();
+  } else {
+    renderUserPicker();
+  }
+}).catch(err => {
+  app.innerHTML = `<div class="loading">เชื่อมต่อไม่สำเร็จ<br><span style="color:#ef4444;font-size:12px">${err.message}</span></div>`;
+});
+
+// ---------- Screen: create first admin ----------
+function renderFirstAdminSetup(){
+  app.innerHTML = `
+    <div class="setup-title">ตั้งค่าเริ่มต้นระบบ</div>
+    <div class="setup-sub">ยังไม่มีบัญชีในระบบ<br>สร้างบัญชี <b>แอดมิน (Admin)</b> คนแรกเพื่อเริ่มใช้งาน</div>
+    <div class="setup-box">
+      <label>ชื่อผู้ใช้งาน</label>
+      <input type="text" id="admName" placeholder="เช่น เจ้าของระบบ">
+      <label>ตั้งรหัส PIN (4 หลัก)</label>
+      <input type="password" id="admPin" maxlength="4" inputmode="numeric" placeholder="••••">
+      <label>ยืนยันรหัส PIN</label>
+      <input type="password" id="admPin2" maxlength="4" inputmode="numeric" placeholder="••••">
+      <button class="btn" id="createAdminBtn">สร้างบัญชีแอดมิน</button>
+      <div class="msg" id="setupMsg"></div>
+    </div>
+  `;
+  document.getElementById('createAdminBtn').onclick = createFirstAdmin;
+}
+
+function createFirstAdmin(){
+  const name = document.getElementById('admName').value.trim();
+  const pin = document.getElementById('admPin').value.trim();
+  const pin2 = document.getElementById('admPin2').value.trim();
+  const msg = document.getElementById('setupMsg');
+  msg.className = 'msg error';
+
+  if(!name){ msg.textContent = 'กรุณากรอกชื่อ'; return; }
+  if(!/^\d{4}$/.test(pin)){ msg.textContent = 'PIN ต้องเป็นตัวเลข 4 หลัก'; return; }
+  if(pin !== pin2){ msg.textContent = 'PIN ไม่ตรงกัน'; return; }
+
+  const newRef = db.ref('users').push();
+  const userData = {
+    name: name,
+    pin: pin,
+    role: 'admin',
+    access: {},        // admin ไม่ต้องระบุ access เห็นทุกร้านอยู่แล้ว
+    permissions: {
+      sell:true, return:true, addProduct:true, editPrice:true,
+      viewProfit:true, viewReport:true, manageSystem:true
+    },
+    createdAt: Date.now()
+  };
+  newRef.set(userData).then(()=>{
+    msg.className = 'msg ok';
+    msg.textContent = 'สร้างบัญชีสำเร็จ กำลังเข้าสู่ระบบ...';
+    setTimeout(()=>{
+      loginSuccess(newRef.key, userData);
+    }, 700);
+  }).catch(err=>{
+    msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  });
+}
+
+// ---------- Screen: pick user avatar, then PIN pad ----------
+function renderUserPicker(){
+  const ids = Object.keys(usersCache);
+  selectedUser = ids[0];
+
+  const avatarsHtml = ids.map(id=>{
+    const u = usersCache[id];
+    const initial = (u.name || '?').trim().charAt(0).toUpperCase();
+    return `<div class="avatar ${id===selectedUser?'active':''}" data-id="${id}">
+      <div class="circle">${initial}</div>
+      <div class="name">${u.name}</div>
+    </div>`;
+  }).join('');
+
+  app.innerHTML = `
+    <h1>เข้าสู่ระบบ</h1>
+    <div class="sub">เลือกบัญชีของคุณ แล้วใส่รหัส PIN</div>
+    <div class="avatar-row" id="avatarRow">${avatarsHtml}</div>
+    <div class="pin-display" id="pinDisplay"></div>
+    <div class="keypad" id="keypad"></div>
+    <div class="msg" id="loginMsg"></div>
+  `;
+
+  document.querySelectorAll('.avatar').forEach(el=>{
+    el.onclick = ()=>{
+      document.querySelectorAll('.avatar').forEach(a=>a.classList.remove('active'));
+      el.classList.add('active');
+      selectedUser = el.dataset.id;
+      currentPin = '';
+      renderPinDots();
+      document.getElementById('loginMsg').textContent = '';
+    };
+  });
+
+  renderKeypad();
+  renderPinDots();
+}
+
+function renderPinDots(){
+  const wrap = document.getElementById('pinDisplay');
+  wrap.innerHTML = '';
+  for(let i=0;i<4;i++){
+    const d = document.createElement('div');
+    d.className = 'pin-dot' + (i < currentPin.length ? ' filled' : '');
+    wrap.appendChild(d);
+  }
+}
+
+function renderKeypad(){
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  const kp = document.getElementById('keypad');
+  kp.innerHTML = '';
+  keys.forEach(k=>{
+    const el = document.createElement('div');
+    if(k===''){ el.className = 'key ghost'; }
+    else {
+      el.className = 'key';
+      el.textContent = k;
+      el.onclick = ()=> handleKey(k);
+    }
+    kp.appendChild(el);
+  });
+}
+
+function handleKey(k){
+  const msg = document.getElementById('loginMsg');
+  msg.textContent = '';
+  if(k === '⌫'){
+    currentPin = currentPin.slice(0,-1);
+  } else if(currentPin.length < 4){
+    currentPin += k;
+  }
+  renderPinDots();
+  if(currentPin.length === 4){
+    setTimeout(()=>attemptLogin(), 150);
+  }
+}
+
+function attemptLogin(){
+  const user = usersCache[selectedUser];
+  const msg = document.getElementById('loginMsg');
+  if(user && user.pin === currentPin){
+    loginSuccess(selectedUser, user);
+  } else {
+    msg.className = 'msg error';
+    msg.textContent = 'รหัส PIN ไม่ถูกต้อง';
+    currentPin = '';
+    renderPinDots();
+  }
+}
+
+// ---------- Success ----------
+function loginSuccess(uid, user){
+  const session = { uid, name:user.name, role:user.role, access:user.access||{}, permissions:user.permissions||{} };
+  localStorage.setItem('shopSession', JSON.stringify(session));
+
+  const roleLabel = {admin:'แอดมิน (ผู้ดูแลระบบ)', owner:'เจ้าของร้าน', staff:'พนักงาน'}[user.role] || user.role;
+  const roleClass = {admin:'role-admin', owner:'role-owner', staff:'role-staff'}[user.role] || '';
+
+  app.innerHTML = `
+    <div class="success-screen">
+      <div class="success-icon">✅</div>
+      <h1>ยินดีต้อนรับ ${user.name}</h1>
+      <div class="info-line">เข้าสู่ระบบสำเร็จ</div>
+      <div class="info-box">
+        <div>สิทธิ์การใช้งาน: <b>${roleLabel}</b> <span class="role-badge ${roleClass}">${user.role.toUpperCase()}</span></div>
+        <div>เข้าถึงร้าน/สาขา: <b>${user.role==='admin' ? 'ทุกร้าน (Admin)' : (Object.keys(user.access||{}).length + ' รายการ')}</b></div>
+      </div>
+      <div class="setup-sub">ระบบส่วนถัดไป (Dashboard/หน้าขาย) ยังไม่ถูกสร้าง — ส่วนนี้คือระบบล็อกอิน + สิทธิ์ ที่จะเชื่อมต่อกับหน้าอื่นๆ ในขั้นตอนถัดไป</div>
+      <button class="logout-btn" onclick="doLogout()">ออกจากระบบ</button>
+    </div>
+  `;
+}
+
+function doLogout(){
+  localStorage.removeItem('shopSession');
+  location.reload();
+}
+</script>
+</body>
+</html>
