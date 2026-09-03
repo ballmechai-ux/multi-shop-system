@@ -26,6 +26,40 @@
   }
   .wrap{ max-width:600px; margin:0 auto; }
 
+  /* ---------- Large screens ---------- */
+  @media (min-width:900px){
+    body{ padding:28px; }
+    .wrap{ max-width:1180px; }
+    .navbar{ padding:18px 26px; border-radius:20px; }
+    .navbar .brand .logo{ width:42px; height:42px; font-size:19px; }
+    .navbar .brand .titles .t1{ font-size:17px; }
+    .navbar .brand .titles .t2{ font-size:12px; }
+    .navbar .who .name{ font-size:15px; }
+    .navbar .who .badge{ font-size:11px; padding:2px 10px; }
+
+    .dash-grid{
+      display:grid; grid-template-columns:300px 1fr; gap:20px; align-items:start;
+    }
+    .side-col{ display:flex; flex-direction:column; gap:16px; }
+    .shop-select{ flex-direction:column; overflow-x:visible; }
+    .shop-chip{ width:100%; padding:12px 16px; font-size:13.5px; }
+    .quick-actions{ gap:12px; }
+    .qa-btn{ padding:18px 8px; font-size:12.5px; }
+    .qa-btn .qi{ font-size:24px; }
+
+    .kpi-grid{ grid-template-columns:repeat(4,1fr); gap:14px; }
+    .kpi{ padding:18px 20px; border-radius:18px; }
+    .kpi .value{ font-size:25px; }
+    .kpi.wide{ grid-column:span 2; }
+
+    .charts-row{ display:grid; grid-template-columns:1.3fr 1fr; gap:16px; }
+    .panel{ margin-bottom:0; padding:22px; }
+    .chart-box{ height:260px; }
+  }
+  @media (min-width:1400px){
+    .wrap{ max-width:1360px; }
+  }
+
   .navbar{
     display:flex; align-items:center; justify-content:space-between;
     background:var(--panel); border:1px solid var(--border); border-radius:16px;
@@ -78,9 +112,10 @@
   .qa-btn .qi{ font-size:19px; display:block; margin-bottom:4px; }
   .qa-btn:active{ border-color:var(--teal); }
 
+  .charts-row{ display:flex; flex-direction:column; gap:14px; margin-bottom:14px; }
   .panel{
     background:var(--panel); border:1px solid var(--border); border-radius:18px;
-    padding:16px; margin-bottom:14px;
+    padding:16px;
   }
   .panel-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .panel-head h3{ font-family:'Kanit'; font-size:14.5px; }
@@ -180,9 +215,12 @@ function renderShell(){
         </div>
       </div>
 
-      <div class="shop-select" id="shopSelect"></div>
-
-      <div id="dashContent"></div>
+      <div class="dash-grid">
+        <div class="side-col">
+          <div class="shop-select" id="shopSelect"></div>
+        </div>
+        <div id="dashContent"></div>
+      </div>
 
       <div class="footer-link"><a href="login.html">← ออกจากระบบ / สลับบัญชี</a></div>
     </div>
@@ -237,21 +275,23 @@ function renderDashboardContent(){
       <div class="qa-btn" data-target="debt"><span class="qi">📒</span>รายการหนี้</div>
     </div>
 
-    <div class="panel">
-      <div class="panel-head">
-        <h3>📈 ยอดขาย 7 วันล่าสุด</h3>
-        <span class="sub">บาท</span>
+    <div class="charts-row">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>📈 ยอดขาย 7 วันล่าสุด</h3>
+          <span class="sub">บาท</span>
+        </div>
+        <div class="chart-box"><canvas id="salesCanvas"></canvas></div>
       </div>
-      <div class="chart-box"><canvas id="salesCanvas"></canvas></div>
-    </div>
 
-    <div class="panel">
-      <div class="panel-head">
-        <h3>📦 จำนวนสินค้าคงเหลือ (ตามหมวด)</h3>
-        <span class="sub">ชิ้น</span>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>📦 จำนวนสินค้าคงเหลือ (ตามหมวด)</h3>
+          <span class="sub">ชิ้น</span>
+        </div>
+        <div class="chart-box"><canvas id="invCanvas"></canvas></div>
+        <div class="empty-note" id="invEmptyNote" style="display:none">ยังไม่มีข้อมูลสินค้า — เพิ่มสินค้าได้ในหน้า "เพิ่มสินค้า" (ยังไม่ถูกสร้าง)</div>
       </div>
-      <div class="chart-box"><canvas id="invCanvas"></canvas></div>
-      <div class="empty-note" id="invEmptyNote" style="display:none">ยังไม่มีข้อมูลสินค้า — เพิ่มสินค้าได้ในหน้า "เพิ่มสินค้า" (ยังไม่ถูกสร้าง)</div>
     </div>
   `;
 
