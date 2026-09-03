@@ -24,6 +24,14 @@
   .topbar h1{ font-family:'Kanit'; font-size:18px; }
   .back-link{ color:var(--accent); font-size:13px; cursor:pointer; }
 
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+  }
+  .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
   .shop-select{ display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:4px; }
   .shop-select::-webkit-scrollbar{ display:none; }
   .shop-chip{
@@ -146,8 +154,26 @@ function renderShell(){
       <div id="mainContent"></div>
     </div>
   `;
+  renderNavBar('addproduct.html');
   renderShopSelect();
   renderForm();
+}
+
+function renderNavBar(activePage){
+  const wrap = document.createElement('div');
+  wrap.className = 'nav-bar';
+  wrap.id = 'navBar';
+  document.getElementById('shopSelect').before(wrap);
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+  ];
+  wrap.innerHTML = items.filter(i=>i.show).map(i=>
+    `<a class="nav-item ${i.href===activePage?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
 }
 
 function renderShopSelect(){

@@ -23,6 +23,13 @@
   .topbar h1{ font-family:'Kanit'; font-size:19px; }
   .topbar .who{ font-size:12px; color:var(--sub); text-align:right; }
   .wrap{ max-width:560px; margin:0 auto; }
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin:0 auto 16px; max-width:560px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+  }
+  .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
   .card{
     background:var(--card); border:1px solid var(--border); border-radius:18px;
     padding:20px; margin-bottom:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);
@@ -125,10 +132,26 @@ function boot(){
       <h1>👨‍💼 จัดการพนักงาน</h1>
       <div class="who">${session.name}<br><span style="color:#93c5fd">ADMIN</span></div>
     </div>
+    <div class="nav-bar" id="navBar"></div>
     <div class="wrap" id="content"></div>
   `;
+  renderNavBar('staffs.html');
   db.ref('shops').on('value', snap=>{ shopsCache = snap.val() || {}; render(); });
   db.ref('users').on('value', snap=>{ usersCache = snap.val() || {}; render(); });
+}
+
+function renderNavBar(activePage){
+  const wrap = document.getElementById('navBar');
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard' },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า' },
+    { href:'products.html', icon:'📦', label:'สินค้า' },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน' }
+  ];
+  wrap.innerHTML = items.map(i=>
+    `<a class="nav-item ${i.href===activePage?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
 }
 
 function render(){

@@ -76,6 +76,15 @@
     background:var(--teal-dim); color:var(--teal); font-family:'Kanit';
   }
 
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:14px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+    display:flex; align-items:center; gap:5px;
+  }
+  .nav-item.active{ border-color:var(--teal); color:var(--teal); background:var(--teal-dim); }
+
   .shop-select{
     display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:4px;
   }
@@ -211,6 +220,7 @@ function renderShell(){
         </div>
       </div>
 
+      <div class="nav-bar" id="navBar"></div>
       <div class="shop-select" id="shopSelect"></div>
 
       <div id="dashContent"></div>
@@ -219,8 +229,24 @@ function renderShell(){
     </div>
   `;
 
+  renderNavBar('dashboard.html');
   renderShopSelect();
   renderDashboardContent();
+}
+
+function renderNavBar(activePage){
+  const wrap = document.getElementById('navBar');
+  if(!wrap) return;
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+  ];
+  wrap.innerHTML = items.filter(i=>i.show).map(i=>
+    `<a class="nav-item ${i.href===activePage?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
 }
 
 function renderShopSelect(){
@@ -289,7 +315,13 @@ function renderDashboardContent(){
   `;
 
   document.querySelectorAll('.qa-btn').forEach(btn=>{
-    btn.onclick = ()=> alert('หน้านี้ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
+    const target = btn.dataset.target;
+    const links = { sell:'sell.html', addproduct:'addproduct.html' };
+    if(links[target]){
+      btn.onclick = ()=> location.href = links[target];
+    } else {
+      btn.onclick = ()=> alert('หน้านี้ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
+    }
   });
 
   loadStatsAndCharts();
