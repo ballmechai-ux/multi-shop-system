@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ข้อมูลลูกค้า - บันทึกหนี้</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:16px; padding-bottom:60px;
+  }
+  .wrap{ max-width:520px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .topbar h1{ font-family:'Kanit'; font-size:17px; }
+  .back-link{ color:var(--accent); font-size:13px; cursor:pointer; }
+
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:18px;
+    padding:18px; margin-bottom:14px;
+  }
+  .card h2{ font-family:'Kanit'; font-size:14.5px; margin-bottom:12px; }
+  label{ font-size:12.5px; color:var(--sub); display:block; margin-bottom:5px; }
+  input{
+    width:100%; padding:12px 13px; margin-bottom:10px; border-radius:12px;
+    border:1px solid var(--border); background:#0f172a; color:var(--text); font-size:14px; font-family:'Sarabun';
+  }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+  .bill-line{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; color:var(--sub); }
+  .bill-line.item{ color:var(--text); }
+  .bill-line.grand{ font-family:'Kanit'; font-size:19px; color:var(--text); border-top:1px solid var(--border); margin-top:8px; padding-top:10px; }
+
+  canvas{
+    width:100%; height:160px; background:#0f172a; border:1px dashed var(--border);
+    border-radius:12px; touch-action:none;
+  }
+  .sig-actions{ display:flex; justify-content:space-between; margin-top:8px; }
+  .sig-actions span{ font-size:12px; color:var(--accent); cursor:pointer; }
+
+  .btn{
+    width:100%; padding:15px; border:none; border-radius:14px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:16px; font-weight:500; cursor:pointer; margin-top:6px;
+  }
+  .btn.outline{ background:transparent; border:1px solid var(--border); color:var(--sub); margin-top:10px; }
+  .msg{ font-size:13px; margin-top:8px; min-height:16px; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:40px 20px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+  .success-screen{ text-align:center; padding:30px 10px; }
+  .success-icon{ font-size:48px; margin-bottom:10px; }
+
+  /* Printable invoice, hidden off-screen until print */
+  #printArea{ position:absolute; left:-9999px; top:0; width:320px; background:#fff; color:#000; padding:16px; font-family:'Sarabun'; }
+  #printArea h2{ font-family:'Kanit'; text-align:center; font-size:16px; margin-bottom:6px; }
+  #printArea table{ width:100%; border-collapse:collapse; font-size:12px; margin:8px 0; }
+  #printArea td{ padding:3px 0; }
+  #printArea .pline{ display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
+  #printArea .ptotal{ font-weight:bold; font-size:14px; border-top:1px solid #000; margin-top:6px; padding-top:6px; }
+  #printArea img.sig{ width:140px; margin-top:6px; }
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; left:0; top:0; }
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังโหลด...</div></div>
+<div id="printArea"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+let sale = null;
+try{ sale = JSON.parse(localStorage.getItem('pendingSale')); }catch(e){}
+
+let sigCtx = null, drawing = false, hasSignature = false;
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(!sale || !sale.items || sale.items.length === 0){
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar"><h1>📒 ข้อมูลลูกค้า</h1></div>
+      <div class="empty-note">ยังไม่มีรายการที่รอบันทึกเป็นหนี้<br><br><a href="sell.html" style="color:#3b82f6;">← กลับไปหน้าขายสินค้า</a></div>
+    </div>`;
+} else {
+  render();
+}
+
+function render(){
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <h1>📒 บันทึกหนี้ลูกค้า</h1>
+        <span class="back-link" onclick="location.href='pay.html'">← กลับ</span>
+      </div>
+
+      <div class="card">
+        <h2>รายการสินค้า</h2>
+        ${sale.items.map(it=>`<div class="bill-line item"><span>${it.name} x${it.qty}</span><span>฿${(it.price*it.qty - (it.discount||0)).toLocaleString()}</span></div>`).join('')}
+        <div class="bill-line grand"><span>ยอดรวม</span><span>฿${sale.grandTotal.toLocaleString()}</span></div>
+      </div>
+
+      <div class="card">
+        <h2>ข้อมูลลูกค้า</h2>
+        <label>เลขบัตรประชาชน</label>
+        <input id="cid" inputmode="numeric" maxlength="13" placeholder="เลขบัตรประชาชน 13 หลัก">
+        <div class="row2">
+          <div><label>ชื่อ</label><input id="cfname" placeholder="ชื่อ"></div>
+          <div><label>นามสกุล</label><input id="clname" placeholder="นามสกุล"></div>
+        </div>
+        <div class="row2">
+          <div><label>บ้านเลขที่</label><input id="chouse" placeholder="บ้านเลขที่"></div>
+          <div><label>หมู่</label><input id="cmoo" placeholder="หมู่"></div>
+        </div>
+        <label>ที่อยู่</label>
+        <input id="caddr" placeholder="ตำบล/อำเภอ/จังหวัด">
+        <label>เบอร์โทร</label>
+        <input id="cphone" inputmode="tel" placeholder="เบอร์โทรศัพท์">
+      </div>
+
+      <div class="card">
+        <h2>✍️ ลายเซ็นลูกค้า</h2>
+        <canvas id="sigPad"></canvas>
+        <div class="sig-actions">
+          <span id="clearSig">ล้างลายเซ็น</span>
+          <span id="sigStatus" style="color:#64748b">ยังไม่ได้เซ็น</span>
+        </div>
+      </div>
+
+      <button class="btn" id="saveBtn">💾 บันทึก + พิมพ์ใบหนี้</button>
+      <button class="btn outline" onclick="location.href='sell.html'">ยกเลิก กลับไปหน้าขาย</button>
+      <div class="msg" id="saveMsg"></div>
+    </div>
+  `;
+
+  setupSignaturePad();
+  document.getElementById('saveBtn').onclick = saveDebt;
+}
+
+function setupSignaturePad(){
+  const canvas = document.getElementById('sigPad');
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * ratio;
+  canvas.height = canvas.clientHeight * ratio;
+  sigCtx = canvas.getContext('2d');
+  sigCtx.scale(ratio, ratio);
+  sigCtx.strokeStyle = '#f1f5f9';
+  sigCtx.lineWidth = 2.2;
+  sigCtx.lineCap = 'round';
+
+  const getPos = (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+  };
+  const start = (e)=>{ drawing = true; hasSignature = true; const p = getPos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x,p.y); document.getElementById('sigStatus').textContent='เซ็นแล้ว'; e.preventDefault(); };
+  const move = (e)=>{ if(!drawing) return; const p = getPos(e); sigCtx.lineTo(p.x,p.y); sigCtx.stroke(); e.preventDefault(); };
+  const end = ()=>{ drawing = false; };
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, {passive:false});
+  canvas.addEventListener('touchmove', move, {passive:false});
+  canvas.addEventListener('touchend', end);
+
+  document.getElementById('clearSig').onclick = ()=>{
+    sigCtx.clearRect(0,0,canvas.width,canvas.height);
+    hasSignature = false;
+    document.getElementById('sigStatus').textContent = 'ยังไม่ได้เซ็น';
+  };
+}
+
+function saveDebt(){
+  const msg = document.getElementById('saveMsg');
+  msg.className = 'msg error';
+  const fname = document.getElementById('cfname').value.trim();
+  const lname = document.getElementById('clname').value.trim();
+  const phone = document.getElementById('cphone').value.trim();
+
+  if(!fname){ msg.textContent = 'กรุณากรอกชื่อลูกค้า'; return; }
+  if(!hasSignature){ msg.textContent = 'กรุณาให้ลูกค้าเซ็นชื่อก่อนบันทึก'; return; }
+
+  const customer = {
+    idCard: document.getElementById('cid').value.trim(),
+    firstName: fname,
+    lastName: lname,
+    houseNo: document.getElementById('chouse').value.trim(),
+    moo: document.getElementById('cmoo').value.trim(),
+    address: document.getElementById('caddr').value.trim(),
+    phone
+  };
+  const signatureData = document.getElementById('sigPad').toDataURL('image/png');
+
+  const basePath = `shops/${sale.shopId}/branches/${sale.branchId}`;
+  const debtRef = db.ref(basePath + '/debtors').push();
+  const debtData = {
+    docNo: debtRef.key.slice(-6).toUpperCase(),
+    customer,
+    items: sale.items,
+    subtotal: sale.subtotal,
+    billDiscount: sale.billDiscount || 0,
+    total: sale.grandTotal,
+    amountPaid: 0,
+    status: 'unpaid',
+    signature: signatureData,
+    staffUid: session.uid,
+    staffName: session.name,
+    date: Date.now()
+  };
+
+  debtRef.set(debtData).then(()=>{
+    const promises = sale.items.map(it=>
+      db.ref(`${basePath}/products/${it.productId}/stock`).transaction(cur=> Math.max(0, (cur||0) - it.qty))
+    );
+    return Promise.all(promises);
+  }).then(()=>{
+    localStorage.removeItem('pendingSale');
+    printInvoice(debtData);
+    showSuccess(debtData);
+  }).catch(err=>{
+    msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  });
+}
+
+function printInvoice(debt){
+  const shopName = 'ร้านค้า';
+  const area = document.getElementById('printArea');
+  area.innerHTML = `
+    <h2>ใบหนี้ / บันทึกค้างชำระ</h2>
+    <div class="pline"><span>เลขที่เอกสาร</span><span>${debt.docNo}</span></div>
+    <div class="pline"><span>วันที่</span><span>${new Date(debt.date).toLocaleDateString('th-TH')}</span></div>
+    <div class="pline"><span>ลูกค้า</span><span>${debt.customer.firstName} ${debt.customer.lastName}</span></div>
+    <div class="pline"><span>เบอร์โทร</span><span>${debt.customer.phone||'-'}</span></div>
+    <table>
+      ${debt.items.map(it=>`<tr><td>${it.name} x${it.qty}</td><td style="text-align:right">฿${(it.price*it.qty-(it.discount||0)).toLocaleString()}</td></tr>`).join('')}
+    </table>
+    <div class="pline ptotal"><span>ยอดค้างชำระ</span><span>฿${debt.total.toLocaleString()}</span></div>
+    <div style="margin-top:10px; font-size:11px;">ลายเซ็นลูกค้า</div>
+    <img class="sig" src="${debt.signature}">
+  `;
+  setTimeout(()=> window.print(), 300);
+}
+
+function showSuccess(debt){
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="success-screen">
+        <div class="success-icon">✅</div>
+        <h1 style="font-family:'Kanit'">บันทึกหนี้สำเร็จ</h1>
+        <div class="card" style="text-align:left; margin-top:16px;">
+          <div class="bill-line"><span>เลขที่เอกสาร</span><span>${debt.docNo}</span></div>
+          <div class="bill-line"><span>ลูกค้า</span><span>${debt.customer.firstName} ${debt.customer.lastName}</span></div>
+          <div class="bill-line grand"><span>ยอดค้างชำระ</span><span>฿${debt.total.toLocaleString()}</span></div>
+        </div>
+        <button class="btn" onclick="window.print()">🖨️ พิมพ์ใบหนี้อีกครั้ง</button>
+        <button class="btn outline" onclick="location.href='sell.html'">🛒 ขายรายการถัดไป</button>
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
