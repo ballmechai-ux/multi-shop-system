@@ -405,7 +405,16 @@ function renderCart(){
     renderCart();
   };
   document.getElementById('goPayBtn').onclick = ()=>{
-    alert('หน้าชำระเงินยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)\\n\\nยอดที่จะส่งไปชำระ: ฿' + grandTotal.toLocaleString());
+    const items = ids.map(id=>({
+      productId:id, name:cart[id].name, price:cart[id].price,
+      qty:cart[id].qty, discount:cart[id].discount||0, unit:cart[id].unit
+    }));
+    const pendingSale = {
+      shopId: currentBranch.shopId, branchId: currentBranch.branchId,
+      items, subtotal, billDiscount, grandTotal
+    };
+    localStorage.setItem('pendingSale', JSON.stringify(pendingSale));
+    location.href = 'pay.html';
   };
 }
 </script>

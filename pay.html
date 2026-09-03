@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ชำระเงิน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:16px; padding-bottom:60px;
+  }
+  .wrap{ max-width:480px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .topbar h1{ font-family:'Kanit'; font-size:18px; }
+  .back-link{ color:var(--accent); font-size:13px; cursor:pointer; }
+
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:18px;
+    padding:18px; margin-bottom:14px;
+  }
+  .bill-line{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; color:var(--sub); }
+  .bill-line.item{ color:var(--text); }
+  .bill-line.grand{ font-family:'Kanit'; font-size:20px; color:var(--text); border-top:1px solid var(--border); margin-top:8px; padding-top:10px; }
+
+  .method-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px; }
+  .method-chip{
+    padding:14px 8px; border-radius:14px; border:1px solid var(--border); background:#0f172a;
+    text-align:center; cursor:pointer; font-family:'Kanit'; font-size:13.5px;
+  }
+  .method-chip .mi{ font-size:20px; display:block; margin-bottom:4px; }
+  .method-chip.active{ border-color:var(--accent); background:#2563eb22; color:#93c5fd; }
+
+  label{ font-size:12.5px; color:var(--sub); display:block; margin:12px 0 6px; }
+  input{
+    width:100%; padding:13px; border-radius:12px; border:1px solid var(--border);
+    background:#0f172a; color:var(--text); font-size:16px; font-family:'Kanit';
+  }
+  .quick-cash{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .quick-cash div{
+    background:#0f172a; border:1px solid var(--border); padding:8px 14px; border-radius:10px;
+    font-size:13px; cursor:pointer;
+  }
+  .change-box{
+    background:#0f172a; border:1px solid var(--border); border-radius:14px; padding:14px;
+    text-align:center; margin-top:12px;
+  }
+  .change-box .clabel{ font-size:12.5px; color:var(--sub); }
+  .change-box .cval{ font-family:'Kanit'; font-size:26px; color:var(--ok); margin-top:4px; }
+  .change-box .cval.neg{ color:var(--danger); }
+
+  .btn{
+    width:100%; padding:15px; border:none; border-radius:14px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:16px; font-weight:500; cursor:pointer; margin-top:14px;
+  }
+  .btn:disabled{ background:#334155; color:#64748b; }
+  .btn.outline{ background:transparent; border:1px solid var(--border); color:var(--sub); }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:40px 20px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+  .success-screen{ text-align:center; padding:30px 10px; }
+  .success-icon{ font-size:48px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังโหลด...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+let sale = null;
+try{ sale = JSON.parse(localStorage.getItem('pendingSale')); }catch(e){}
+
+let method = 'cash';
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(!sale || !sale.items || sale.items.length === 0){
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar"><h1>💰 ชำระเงิน</h1></div>
+      <div class="empty-note">ยังไม่มีรายการที่รอชำระเงิน<br><br><a href="sell.html" style="color:#3b82f6;">← กลับไปหน้าขายสินค้า</a></div>
+    </div>`;
+} else {
+  render();
+}
+
+function render(){
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <h1>💰 ชำระเงิน</h1>
+        <span class="back-link" onclick="location.href='sell.html'">← กลับไปแก้บิล</span>
+      </div>
+
+      <div class="card">
+        ${sale.items.map(it=>`<div class="bill-line item"><span>${it.name} x${it.qty}</span><span>฿${(it.price*it.qty - (it.discount||0)).toLocaleString()}</span></div>`).join('')}
+        <div class="bill-line"><span>ยอดรวมสินค้า</span><span>฿${sale.subtotal.toLocaleString()}</span></div>
+        <div class="bill-line"><span>ส่วนลดบิล</span><span>-฿${(sale.billDiscount||0).toLocaleString()}</span></div>
+        <div class="bill-line grand"><span>ยอดสุทธิ</span><span>฿${sale.grandTotal.toLocaleString()}</span></div>
+      </div>
+
+      <div class="card">
+        <label style="margin-top:0">วิธีชำระเงิน</label>
+        <div class="method-grid">
+          <div class="method-chip active" data-m="cash"><span class="mi">💵</span>เงินสด</div>
+          <div class="method-chip" data-m="transfer"><span class="mi">🏦</span>โอนเงิน</div>
+          <div class="method-chip" data-m="qr"><span class="mi">📱</span>QR Payment</div>
+          <div class="method-chip" data-m="other"><span class="mi">➕</span>อื่นๆ</div>
+        </div>
+
+        <div id="cashSection">
+          <label>รับเงินมา (บาท)</label>
+          <input type="number" id="cashReceived" placeholder="0" inputmode="decimal">
+          <div class="quick-cash" id="quickCash"></div>
+          <div class="change-box">
+            <div class="clabel">เงินทอน</div>
+            <div class="cval" id="changeVal">฿0</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn" id="paidBtn">✅ ชำระแล้ว</button>
+      <button class="btn outline" id="unpaidBtn">📒 ลูกค้ายังไม่จ่าย (บันทึกเป็นหนี้)</button>
+    </div>
+  `;
+
+  document.querySelectorAll('.method-chip').forEach(el=>{
+    el.onclick = ()=>{
+      method = el.dataset.m;
+      document.querySelectorAll('.method-chip').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('cashSection').style.display = method === 'cash' ? 'block' : 'none';
+      updatePayButtonState();
+    };
+  });
+
+  const quickAmts = [sale.grandTotal, ...[20,50,100,500,1000].filter(v=>v>=sale.grandTotal)].slice(0,4);
+  document.getElementById('quickCash').innerHTML = [...new Set(quickAmts)].map(v=>`<div data-v="${v}">฿${v.toLocaleString()}</div>`).join('');
+  document.querySelectorAll('#quickCash div').forEach(el=>{
+    el.onclick = ()=>{
+      document.getElementById('cashReceived').value = el.dataset.v;
+      updateChange();
+    };
+  });
+
+  document.getElementById('cashReceived').oninput = updateChange;
+  document.getElementById('paidBtn').onclick = ()=> confirmPayment('paid');
+  document.getElementById('unpaidBtn').onclick = ()=> confirmPayment('unpaid');
+  updateChange();
+}
+
+function updateChange(){
+  const received = parseFloat(document.getElementById('cashReceived').value) || 0;
+  const change = received - sale.grandTotal;
+  const el = document.getElementById('changeVal');
+  el.textContent = '฿' + Math.abs(change).toLocaleString();
+  el.className = 'cval' + (change < 0 ? ' neg' : '');
+  updatePayButtonState();
+}
+
+function updatePayButtonState(){
+  const paidBtn = document.getElementById('paidBtn');
+  if(method === 'cash'){
+    const received = parseFloat(document.getElementById('cashReceived').value) || 0;
+    paidBtn.disabled = received < sale.grandTotal;
+  } else {
+    paidBtn.disabled = false;
+  }
+}
+
+function confirmPayment(status){
+  const received = method === 'cash' ? (parseFloat(document.getElementById('cashReceived').value)||0) : sale.grandTotal;
+  const change = method === 'cash' ? received - sale.grandTotal : 0;
+
+  if(status === 'unpaid'){
+    alert('ระบบลูกหนี้ (บันทึกชื่อลูกค้า/ที่อยู่/ลายเซ็น) ยังไม่ถูกสร้าง — ขั้นตอนถัดไปของระบบ\\n\\nตอนนี้จะยังไม่บันทึกบิลนี้ ลองใหม่อีกครั้งหลังหน้าลูกหนี้ถูกสร้างแล้วนะครับ');
+    return;
+  }
+
+  const basePath = `shops/${sale.shopId}/branches/${sale.branchId}`;
+  const billRef = db.ref(basePath + '/bills').push();
+  const billData = {
+    items: sale.items,
+    subtotal: sale.subtotal,
+    billDiscount: sale.billDiscount || 0,
+    total: sale.grandTotal,
+    paymentMethod: method,
+    cashReceived: method === 'cash' ? received : null,
+    change: method === 'cash' ? change : 0,
+    status: 'paid',
+    staffUid: session.uid,
+    staffName: session.name,
+    date: Date.now()
+  };
+
+  billRef.set(billData).then(()=>{
+    // decrement stock for each item
+    const promises = sale.items.map(it=>{
+      return db.ref(`${basePath}/products/${it.productId}/stock`).transaction(cur=> Math.max(0, (cur||0) - it.qty));
+    });
+    return Promise.all(promises);
+  }).then(()=>{
+    localStorage.removeItem('pendingSale');
+    showSuccess(billData);
+  }).catch(err=>{
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+  });
+}
+
+function showSuccess(bill){
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="success-screen">
+        <div class="success-icon">✅</div>
+        <h1 style="font-family:'Kanit'">ชำระเงินสำเร็จ</h1>
+        <div class="card" style="text-align:left; margin-top:16px;">
+          <div class="bill-line"><span>ยอดชำระ</span><span>฿${bill.total.toLocaleString()}</span></div>
+          <div class="bill-line"><span>วิธีชำระ</span><span>${ {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'}[bill.paymentMethod] }</span></div>
+          ${bill.paymentMethod==='cash' ? `<div class="bill-line"><span>รับเงิน</span><span>฿${bill.cashReceived.toLocaleString()}</span></div>
+          <div class="bill-line"><span>เงินทอน</span><span>฿${bill.change.toLocaleString()}</span></div>` : ''}
+        </div>
+        <button class="btn" onclick="location.href='sell.html'">🛒 ขายรายการถัดไป</button>
+        <button class="btn outline" onclick="location.href='dashboard.html'">กลับไป Dashboard</button>
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
