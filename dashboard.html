@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dashboard - ระบบร้านค้า</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#060b16; --panel:#0d1526; --panel2:#111d33; --border:#1c2b45;
+    --teal:#22d3ee; --teal-dim:#22d3ee33; --gold:#fbbf24; --gold-dim:#fbbf2433;
+    --text:#e8edf5; --sub:#7c8aa5; --danger:#f87171; --ok:#4ade80;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:
+      radial-gradient(circle at 15% 0%, #0e2a3a55, transparent 45%),
+      radial-gradient(circle at 90% 10%, #3a2e0e55, transparent 40%),
+      var(--bg);
+    min-height:100vh; color:var(--text); padding:14px; padding-bottom:50px;
+  }
+  .wrap{ max-width:600px; margin:0 auto; }
+
+  .navbar{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel); border:1px solid var(--border); border-radius:16px;
+    padding:14px 16px; margin-bottom:14px;
+  }
+  .navbar .brand{ display:flex; align-items:center; gap:10px; }
+  .navbar .brand .logo{
+    width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,var(--teal),var(--gold));
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+  }
+  .navbar .brand .titles{ line-height:1.25; }
+  .navbar .brand .titles .t1{ font-family:'Kanit'; font-size:14.5px; }
+  .navbar .brand .titles .t2{ font-size:10.5px; color:var(--sub); }
+  .navbar .who{ text-align:right; font-size:11px; color:var(--sub); }
+  .navbar .who .name{ font-family:'Kanit'; color:var(--text); font-size:13px; }
+  .navbar .who .badge{
+    display:inline-block; margin-top:2px; font-size:9.5px; padding:1px 8px; border-radius:20px;
+    background:var(--teal-dim); color:var(--teal); font-family:'Kanit';
+  }
+
+  .shop-select{
+    display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:4px;
+  }
+  .shop-select::-webkit-scrollbar{ display:none; }
+  .shop-chip{
+    flex:0 0 auto; background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12.5px; color:var(--sub); cursor:pointer; white-space:nowrap;
+  }
+  .shop-chip.active{ border-color:var(--teal); color:var(--teal); background:var(--teal-dim); }
+
+  .kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+  .kpi{
+    background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:14px;
+    position:relative; overflow:hidden;
+  }
+  .kpi .icon{ font-size:18px; }
+  .kpi .label{ font-size:11.5px; color:var(--sub); margin-top:6px; }
+  .kpi .value{ font-family:'Kanit'; font-size:21px; margin-top:2px; }
+  .kpi.accent-teal .value{ color:var(--teal); }
+  .kpi.accent-gold .value{ color:var(--gold); }
+  .kpi.accent-danger .value{ color:var(--danger); }
+  .kpi.wide{ grid-column:span 2; display:flex; align-items:center; justify-content:space-between; }
+  .kpi.wide .value{ font-size:16px; }
+
+  .quick-actions{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
+  .qa-btn{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:12px 4px; text-align:center; cursor:pointer; font-size:11px; color:var(--text);
+  }
+  .qa-btn .qi{ font-size:19px; display:block; margin-bottom:4px; }
+  .qa-btn:active{ border-color:var(--teal); }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:18px;
+    padding:16px; margin-bottom:14px;
+  }
+  .panel-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .panel-head h3{ font-family:'Kanit'; font-size:14.5px; }
+  .panel-head .sub{ font-size:11px; color:var(--sub); }
+  .chart-box{ height:180px; position:relative; }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:12px; padding:8px 0; }
+  .footer-link{ text-align:center; font-size:12px; margin-top:8px; }
+  .footer-link a{ color:var(--teal); text-decoration:none; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังโหลด...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#22d3ee;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let branchOptions = [];   // [{shopId, shopName, branchId, branchName}]
+let currentBranch = null; // {shopId, branchId}
+let salesChart = null, invChart = null;
+
+function boot(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    buildBranchOptions();
+    renderShell();
+  });
+}
+
+function buildBranchOptions(){
+  branchOptions = [];
+  Object.keys(shopsCache).forEach(shopId=>{
+    const shop = shopsCache[shopId];
+    const info = shop.info || {};
+    const branches = shop.branches || {};
+    const branchIds = Object.keys(branches);
+
+    // determine if this user can see this shop's branches
+    let allowedBranchIds = branchIds;
+    if(session.role !== 'admin'){
+      const access = session.access || {};
+      if(!access[shopId]) return; // no access to this shop at all
+      allowedBranchIds = branchIds.filter(bid => access[shopId][bid]);
+    }
+    allowedBranchIds.forEach(bid=>{
+      branchOptions.push({
+        shopId, shopName: info.name, shopType: info.type,
+        branchId: bid, branchName: branches[bid].name
+      });
+    });
+  });
+  if(!currentBranch && branchOptions.length){
+    currentBranch = { shopId: branchOptions[0].shopId, branchId: branchOptions[0].branchId };
+  }
+}
+
+function renderShell(){
+  const roleLabel = {admin:'ADMIN', owner:'OWNER', staff:'STAFF'}[session.role] || session.role;
+
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="navbar">
+        <div class="brand">
+          <div class="logo">🏮</div>
+          <div class="titles">
+            <div class="t1">ระบบร้านค้า</div>
+            <div class="t2">Multi-Shop Dashboard</div>
+          </div>
+        </div>
+        <div class="who">
+          <div class="name">${session.name}</div>
+          <span class="badge">${roleLabel}</span>
+        </div>
+      </div>
+
+      <div class="shop-select" id="shopSelect"></div>
+
+      <div id="dashContent"></div>
+
+      <div class="footer-link"><a href="login.html">← ออกจากระบบ / สลับบัญชี</a></div>
+    </div>
+  `;
+
+  renderShopSelect();
+  renderDashboardContent();
+}
+
+function renderShopSelect(){
+  const wrap = document.getElementById('shopSelect');
+  if(branchOptions.length === 0){
+    wrap.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขาที่เข้าถึงได้</div>`;
+    return;
+  }
+  wrap.innerHTML = branchOptions.map(b=>{
+    const active = currentBranch && currentBranch.shopId===b.shopId && currentBranch.branchId===b.branchId;
+    return `<div class="shop-chip ${active?'active':''}" data-shop="${b.shopId}" data-branch="${b.branchId}">
+      ${b.shopName} · ${b.branchName}
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.shop-chip').forEach(el=>{
+    el.onclick = ()=>{
+      currentBranch = { shopId: el.dataset.shop, branchId: el.dataset.branch };
+      renderShopSelect();
+      renderDashboardContent();
+    };
+  });
+}
+
+function renderDashboardContent(){
+  const content = document.getElementById('dashContent');
+  if(!currentBranch){
+    content.innerHTML = `<div class="panel"><div class="empty-note">ยังไม่มีร้าน/สาขาให้แสดงข้อมูล — ไปที่ shops.html เพื่อเพิ่มร้านก่อน</div></div>`;
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi accent-teal"><div class="icon">💰</div><div class="label">ยอดขายวันนี้</div><div class="value">฿0</div></div>
+      <div class="kpi accent-teal"><div class="icon">🧾</div><div class="label">จำนวนบิลวันนี้</div><div class="value">0</div></div>
+      <div class="kpi accent-gold"><div class="icon">📈</div><div class="label">กำไรวันนี้</div><div class="value">฿0</div></div>
+      <div class="kpi accent-danger"><div class="icon">👤</div><div class="label">ยอดลูกหนี้</div><div class="value">฿0</div></div>
+      <div class="kpi wide"><div><div class="icon">📦</div><div class="label">สินค้าใกล้หมด / หมด</div></div><div class="value">0 / 0</div></div>
+      <div class="kpi wide"><div><div class="icon">🏆</div><div class="label">สินค้าขายดีวันนี้</div></div><div class="value" id="bestSellerVal">-</div></div>
+    </div>
+
+    <div class="quick-actions">
+      <div class="qa-btn" data-target="sell"><span class="qi">🛒</span>ขายสินค้า</div>
+      <div class="qa-btn" data-target="addproduct"><span class="qi">➕</span>เพิ่มสินค้า</div>
+      <div class="qa-btn" data-target="receive"><span class="qi">📥</span>รับสินค้าเข้า</div>
+      <div class="qa-btn" data-target="debt"><span class="qi">📒</span>รายการหนี้</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>📈 ยอดขาย 7 วันล่าสุด</h3>
+        <span class="sub">บาท</span>
+      </div>
+      <div class="chart-box"><canvas id="salesCanvas"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h3>📦 จำนวนสินค้าคงเหลือ (ตามหมวด)</h3>
+        <span class="sub">ชิ้น</span>
+      </div>
+      <div class="chart-box"><canvas id="invCanvas"></canvas></div>
+      <div class="empty-note" id="invEmptyNote" style="display:none">ยังไม่มีข้อมูลสินค้า — เพิ่มสินค้าได้ในหน้า "เพิ่มสินค้า" (ยังไม่ถูกสร้าง)</div>
+    </div>
+  `;
+
+  document.querySelectorAll('.qa-btn').forEach(btn=>{
+    btn.onclick = ()=> alert('หน้านี้ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
+  });
+
+  loadStatsAndCharts();
+}
+
+function loadStatsAndCharts(){
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+
+  // Sales trend: last 7 days from bills node (may not exist yet)
+  const labels = [];
+  const salesData = [];
+  const today = new Date();
+  for(let i=6;i>=0;i--){
+    const d = new Date(today);
+    d.setDate(d.getDate()-i);
+    labels.push(d.toLocaleDateString('th-TH', { day:'numeric', month:'short' }));
+    salesData.push(0);
+  }
+
+  db.ref(basePath + '/bills').once('value').then(snap=>{
+    const bills = snap.val() || {};
+    Object.values(bills).forEach(bill=>{
+      if(!bill.date) return;
+      const d = new Date(bill.date);
+      const diffDays = Math.floor((today - d) / 86400000);
+      if(diffDays >=0 && diffDays < 7){
+        salesData[6-diffDays] += (bill.total || 0);
+      }
+    });
+    renderSalesChart(labels, salesData);
+  }).catch(()=> renderSalesChart(labels, salesData));
+
+  // Inventory by category
+  db.ref(basePath + '/products').once('value').then(snap=>{
+    const products = snap.val() || {};
+    const byCat = {};
+    Object.values(products).forEach(p=>{
+      const cat = p.category || 'ไม่ระบุหมวด';
+      byCat[cat] = (byCat[cat]||0) + (p.stock || 0);
+    });
+    const catLabels = Object.keys(byCat);
+    document.getElementById('invEmptyNote').style.display = catLabels.length ? 'none':'block';
+    renderInvChart(catLabels.length ? catLabels : ['ยังไม่มีข้อมูล'], catLabels.length ? Object.values(byCat) : [0]);
+  }).catch(()=> renderInvChart(['ยังไม่มีข้อมูล'], [0]));
+}
+
+function renderSalesChart(labels, data){
+  const ctx = document.getElementById('salesCanvas');
+  if(salesChart) salesChart.destroy();
+  salesChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[{
+      data, borderColor:'#22d3ee', backgroundColor:'#22d3ee22',
+      fill:true, tension:.35, pointRadius:3, pointBackgroundColor:'#22d3ee'
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{color:'#7c8aa5', font:{family:'Sarabun', size:10}}, grid:{color:'#1c2b45'} },
+        y:{ ticks:{color:'#7c8aa5', font:{family:'Sarabun', size:10}}, grid:{color:'#1c2b45'} }
+      }
+    }
+  });
+}
+
+function renderInvChart(labels, data){
+  const ctx = document.getElementById('invCanvas');
+  if(invChart) invChart.destroy();
+  invChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{
+      data, backgroundColor:'#fbbf24aa', borderRadius:6, borderColor:'#fbbf24', borderWidth:1
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{color:'#7c8aa5', font:{family:'Sarabun', size:10}}, grid:{display:false} },
+        y:{ ticks:{color:'#7c8aa5', font:{family:'Sarabun', size:10}}, grid:{color:'#1c2b45'} }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
