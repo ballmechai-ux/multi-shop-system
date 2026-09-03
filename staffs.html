@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>จัดการพนักงาน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:16px; padding-bottom:60px;
+  }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; max-width:560px; margin:0 auto 18px; }
+  .topbar h1{ font-family:'Kanit'; font-size:19px; }
+  .topbar .who{ font-size:12px; color:var(--sub); text-align:right; }
+  .wrap{ max-width:560px; margin:0 auto; }
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:18px;
+    padding:20px; margin-bottom:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  .card h2{ font-family:'Kanit'; font-size:16px; margin-bottom:14px; }
+  input{
+    width:100%; padding:12px 13px; margin-bottom:10px; border-radius:12px;
+    border:1px solid var(--border); background:#0f172a; color:var(--text); font-size:14px; font-family:'Sarabun';
+  }
+  label{ font-size:12.5px; color:var(--sub); display:block; margin-bottom:5px; }
+  .btn{
+    padding:12px 18px; border:none; border-radius:12px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:14.5px; font-weight:500; cursor:pointer; width:100%;
+  }
+  .btn:active{ background:var(--accent2); }
+  .btn.small{ width:auto; padding:8px 14px; font-size:13px; }
+  .btn.danger{ background:transparent; border:1px solid var(--danger); color:var(--danger); }
+  .msg{ font-size:13px; margin-top:8px; min-height:16px; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+  .role-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+  .role-chip{
+    padding:12px; border-radius:12px; border:1px solid var(--border); background:#0f172a;
+    text-align:center; font-size:14px; cursor:pointer; font-family:'Kanit';
+  }
+  .role-chip.active{ border-color:var(--accent); background:#2563eb22; color:#93c5fd; }
+  .section-label{ font-family:'Kanit'; font-size:13.5px; margin:14px 0 8px; color:var(--text); }
+  .shop-block{ border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:8px; background:#0f172a; }
+  .shop-block .shead{ font-family:'Kanit'; font-size:14px; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .branch-check{ display:flex; align-items:center; gap:8px; padding:5px 0 5px 10px; font-size:13.5px; }
+  .branch-check input{ width:auto; margin:0; }
+  .perm-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px; }
+  .perm-check{
+    display:flex; align-items:center; gap:8px; background:#0f172a; border:1px solid var(--border);
+    border-radius:10px; padding:9px 10px; font-size:13px;
+  }
+  .perm-check input{ width:auto; margin:0; }
+  .user-item{
+    background:#0f172a; border:1px solid var(--border); border-radius:14px;
+    padding:14px; margin-bottom:10px;
+  }
+  .user-item .top{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .user-item .name{ font-family:'Kanit'; font-size:15px; }
+  .badge{ font-size:10.5px; padding:2px 9px; border-radius:20px; font-family:'Kanit'; }
+  .badge.owner{ background:#2563eb44; color:#93c5fd; }
+  .badge.staff{ background:#0d948844; color:#5eead4; }
+  .user-item .meta{ font-size:12px; color:var(--sub); margin-top:6px; line-height:1.6; }
+  .empty{ text-align:center; color:var(--sub); font-size:13px; padding:20px 0; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+  .row-actions{ display:flex; gap:8px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังตรวจสอบสิทธิ์...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const PERMISSIONS = [
+  {key:'sell', label:'ขาย'},
+  {key:'return', label:'คืนสินค้า'},
+  {key:'addProduct', label:'เพิ่มสินค้า'},
+  {key:'editPrice', label:'แก้ราคา'},
+  {key:'viewProfit', label:'ดูกำไร'},
+  {key:'viewReport', label:'ดูรายงาน'},
+  {key:'manageSystem', label:'จัดการระบบ'}
+];
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(session.role !== 'admin'){
+  app.innerHTML = `<div class="blocked"><h1>ไม่มีสิทธิ์เข้าถึง</h1><p>หน้านี้สำหรับแอดมินเท่านั้น</p><br><a href="login.html" style="color:#3b82f6;">กลับหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let usersCache = {};
+let selectedRole = 'staff';
+
+function boot(){
+  app.innerHTML = `
+    <div class="topbar">
+      <h1>👨‍💼 จัดการพนักงาน</h1>
+      <div class="who">${session.name}<br><span style="color:#93c5fd">ADMIN</span></div>
+    </div>
+    <div class="wrap" id="content"></div>
+  `;
+  db.ref('shops').on('value', snap=>{ shopsCache = snap.val() || {}; render(); });
+  db.ref('users').on('value', snap=>{ usersCache = snap.val() || {}; render(); });
+}
+
+function render(){
+  renderUserList();
+  renderAddForm();
+}
+
+// ---------- User list ----------
+function renderUserList(){
+  const content = document.getElementById('content');
+  let listWrap = document.getElementById('userListCard');
+  const ids = Object.keys(usersCache).filter(id => usersCache[id].role !== 'admin');
+
+  const html = ids.length === 0
+    ? `<div class="empty">ยังไม่มีพนักงานในระบบ เพิ่มคนแรกด้านล่าง</div>`
+    : ids.map(id=>{
+        const u = usersCache[id];
+        const roleLabel = u.role === 'owner' ? 'เจ้าของร้าน' : 'พนักงาน';
+        const accessList = Object.keys(u.access||{}).map(shopId=>{
+          const shop = shopsCache[shopId];
+          if(!shop) return null;
+          const branchIds = Object.keys(u.access[shopId]||{}).filter(b=>u.access[shopId][b]);
+          const branchNames = branchIds.map(b => (shop.branches && shop.branches[b]) ? shop.branches[b].name : b).join(', ');
+          return `${shop.info.name}${branchNames ? ' (' + branchNames + ')' : ''}`;
+        }).filter(Boolean).join(' · ') || 'ยังไม่กำหนดร้าน';
+        const permsOn = PERMISSIONS.filter(p => u.permissions && u.permissions[p.key]).map(p=>p.label).join(', ') || 'ไม่มีสิทธิ์';
+
+        return `<div class="user-item">
+          <div class="top">
+            <div class="name">${u.name}</div>
+            <span class="badge ${u.role}">${u.role.toUpperCase()}</span>
+          </div>
+          <div class="meta">
+            บทบาท: ${roleLabel}<br>
+            เข้าถึง: ${accessList}<br>
+            สิทธิ์: ${permsOn}
+          </div>
+          <div class="row-actions">
+            <button class="btn danger small" data-action="del" data-id="${id}">ลบบัญชี</button>
+          </div>
+        </div>`;
+      }).join('');
+
+  if(!listWrap){
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'userListCard';
+    card.innerHTML = `<h2>รายชื่อพนักงานทั้งหมด</h2><div id="userListInner"></div>`;
+    content.prepend(card);
+  }
+  document.getElementById('userListInner').innerHTML = html;
+  document.querySelectorAll('[data-action="del"]').forEach(btn=>{
+    btn.onclick = ()=> deleteUser(btn.dataset.id, usersCache[btn.dataset.id].name);
+  });
+}
+
+function deleteUser(uid, name){
+  if(!confirm(`ยืนยันลบบัญชี "${name}"?`)) return;
+  db.ref('users/' + uid).remove();
+}
+
+// ---------- Add form ----------
+function renderAddForm(){
+  const content = document.getElementById('content');
+  let formCard = document.getElementById('addUserCard');
+  if(formCard) return; // build once; access checkboxes rebuilt via refreshShopTree
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'addUserCard';
+  card.innerHTML = `
+    <h2>➕ เพิ่มพนักงานใหม่</h2>
+    <label>ชื่อผู้ใช้งาน</label>
+    <input id="uName" placeholder="ชื่อ-นามสกุล หรือชื่อเล่น">
+    <label>ตั้งรหัส PIN (4 หลัก)</label>
+    <input id="uPin" maxlength="4" inputmode="numeric" placeholder="••••">
+
+    <div class="section-label">บทบาท</div>
+    <div class="role-grid">
+      <div class="role-chip active" data-role="staff">พนักงาน (Staff)</div>
+      <div class="role-chip" data-role="owner">เจ้าของร้าน (Owner)</div>
+    </div>
+
+    <div class="section-label">เข้าถึงร้าน/สาขาไหนได้บ้าง</div>
+    <div id="shopTree"></div>
+
+    <div class="section-label">สิทธิ์การใช้งาน</div>
+    <div class="perm-grid" id="permGrid"></div>
+
+    <button class="btn" id="addUserBtn" style="margin-top:10px">เพิ่มพนักงาน</button>
+    <div class="msg" id="addMsg"></div>
+  `;
+  content.appendChild(card);
+
+  document.querySelectorAll('.role-chip').forEach(el=>{
+    el.onclick = ()=>{
+      selectedRole = el.dataset.role;
+      document.querySelectorAll('.role-chip').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active');
+    };
+  });
+
+  document.getElementById('permGrid').innerHTML = PERMISSIONS.map(p=>
+    `<label class="perm-check"><input type="checkbox" data-perm="${p.key}"> ${p.label}</label>`
+  ).join('');
+
+  refreshShopTree();
+  document.getElementById('addUserBtn').onclick = addUser;
+}
+
+function refreshShopTree(){
+  const wrap = document.getElementById('shopTree');
+  if(!wrap) return;
+  const shopIds = Object.keys(shopsCache);
+  if(shopIds.length === 0){
+    wrap.innerHTML = `<div class="empty">ยังไม่มีร้านในระบบ กรุณาเพิ่มร้านก่อนใน shops.html</div>`;
+    return;
+  }
+  wrap.innerHTML = shopIds.map(shopId=>{
+    const shop = shopsCache[shopId];
+    const branchIds = Object.keys(shop.branches || {});
+    const branchHtml = branchIds.length === 0
+      ? `<div class="branch-check" style="color:#64748b">ร้านนี้ยังไม่มีสาขา</div>`
+      : branchIds.map(bid=>{
+          const b = shop.branches[bid];
+          return `<label class="branch-check">
+            <input type="checkbox" data-shop="${shopId}" data-branch="${bid}"> ${b.name}
+          </label>`;
+        }).join('');
+    return `<div class="shop-block">
+      <div class="shead">🏪 ${shop.info.name} <span style="font-size:11px;color:#93c5fd">${shop.info.type}</span></div>
+      ${branchHtml}
+    </div>`;
+  }).join('');
+}
+
+// re-render shop tree whenever shopsCache updates (in case add form already exists)
+const origRender = render;
+render = function(){
+  renderUserList();
+  renderAddForm();
+  refreshShopTree();
+};
+
+function addUser(){
+  const name = document.getElementById('uName').value.trim();
+  const pin = document.getElementById('uPin').value.trim();
+  const msg = document.getElementById('addMsg');
+  msg.className = 'msg error';
+
+  if(!name){ msg.textContent = 'กรุณากรอกชื่อ'; return; }
+  if(!/^\d{4}$/.test(pin)){ msg.textContent = 'PIN ต้องเป็นตัวเลข 4 หลัก'; return; }
+
+  const access = {};
+  document.querySelectorAll('#shopTree input[type=checkbox]:checked').forEach(cb=>{
+    const shopId = cb.dataset.shop, branchId = cb.dataset.branch;
+    if(!access[shopId]) access[shopId] = {};
+    access[shopId][branchId] = true;
+  });
+
+  const permissions = {};
+  document.querySelectorAll('#permGrid input[type=checkbox]').forEach(cb=>{
+    permissions[cb.dataset.perm] = cb.checked;
+  });
+
+  const ref = db.ref('users').push();
+  ref.set({
+    name, pin, role: selectedRole, access, permissions, createdAt: Date.now()
+  }).then(()=>{
+    msg.className = 'msg ok';
+    msg.textContent = 'เพิ่มพนักงานสำเร็จ';
+    document.getElementById('uName').value = '';
+    document.getElementById('uPin').value = '';
+    document.querySelectorAll('#shopTree input, #permGrid input').forEach(cb=>cb.checked=false);
+  }).catch(err=>{
+    msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  });
+}
+</script>
+</body>
+</html>
