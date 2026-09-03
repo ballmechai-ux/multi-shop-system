@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ขายสินค้า</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:14px; padding-bottom:190px;
+  }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; max-width:900px; margin:0 auto 14px; }
+  .topbar h1{ font-family:'Kanit'; font-size:18px; }
+  .topbar .who{ font-size:11px; color:var(--sub); text-align:right; }
+  .wrap{ max-width:900px; margin:0 auto; }
+
+  .shop-select{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .shop-select::-webkit-scrollbar{ display:none; }
+  .shop-chip{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12.5px; color:var(--sub); cursor:pointer; white-space:nowrap;
+  }
+  .shop-chip.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .search-row{ display:flex; gap:8px; margin-bottom:12px; }
+  .search-row input{
+    flex:1; padding:12px 13px; border-radius:12px; border:1px solid var(--border);
+    background:var(--card); color:var(--text); font-size:14px; font-family:'Sarabun';
+  }
+  .scan-btn{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:0 16px; font-size:18px; cursor:pointer;
+  }
+
+  .product-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .product-card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px;
+    cursor:pointer;
+  }
+  .product-card:active{ border-color:var(--accent); }
+  .product-card .pname{ font-family:'Kanit'; font-size:13.5px; margin-bottom:4px; }
+  .product-card .pmeta{ font-size:11.5px; color:var(--sub); }
+  .product-card .pprice{ font-family:'Kanit'; color:#93c5fd; font-size:15px; margin-top:6px; }
+  .product-card .pstock{ font-size:10.5px; margin-top:2px; }
+  .pstock.low{ color:#fbbf24; }
+  .pstock.out{ color:var(--danger); }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:12.5px; padding:20px 10px; }
+
+  /* ---------- Cart drawer (bottom sheet, fixed) ---------- */
+  .cart-panel{
+    position:fixed; left:0; right:0; bottom:0; background:#0b1222; border-top:1px solid var(--border);
+    border-radius:22px 22px 0 0; box-shadow:0 -10px 30px rgba(0,0,0,.4);
+    max-width:900px; margin:0 auto; padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    max-height:60vh; display:flex; flex-direction:column;
+  }
+  .cart-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .cart-head h3{ font-family:'Kanit'; font-size:15px; }
+  .cart-count{ font-size:11.5px; color:var(--sub); }
+  .cart-items{ overflow-y:auto; flex:1; margin-bottom:8px; }
+  .cart-line{
+    display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border);
+  }
+  .cart-line .cinfo{ flex:1; min-width:0; }
+  .cart-line .cname{ font-size:13px; font-family:'Kanit'; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cart-line .cprice{ font-size:11px; color:var(--sub); }
+  .qty-ctrl{ display:flex; align-items:center; gap:6px; }
+  .qty-ctrl button{
+    width:26px; height:26px; border-radius:8px; border:1px solid var(--border); background:#0f172a;
+    color:var(--text); font-size:15px; cursor:pointer;
+  }
+  .qty-ctrl .qn{ min-width:20px; text-align:center; font-size:13.5px; }
+  .cline-total{ font-family:'Kanit'; font-size:13.5px; width:60px; text-align:right; }
+  .cline-del{ color:var(--danger); font-size:16px; cursor:pointer; padding:0 2px; }
+
+  .discount-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .discount-row label{ font-size:12px; color:var(--sub); white-space:nowrap; }
+  .discount-row input{
+    width:90px; padding:7px 9px; border-radius:9px; border:1px solid var(--border);
+    background:#0f172a; color:var(--text); font-size:13px; text-align:right;
+  }
+
+  .cart-summary{ display:flex; justify-content:space-between; font-size:13px; color:var(--sub); padding:2px 0; }
+  .cart-summary.grand{ font-family:'Kanit'; font-size:18px; color:var(--text); margin-top:4px; }
+
+  .pay-btn{
+    width:100%; padding:14px; border:none; border-radius:14px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:16px; font-weight:500; cursor:pointer; margin-top:10px;
+  }
+  .pay-btn:disabled{ background:#334155; color:#64748b; }
+
+  .cart-fab{
+    position:fixed; right:16px; bottom:16px; background:var(--accent); color:#fff;
+    border-radius:50%; width:56px; height:56px; display:none; align-items:center; justify-content:center;
+    font-size:22px; box-shadow:0 6px 20px rgba(0,0,0,.4); cursor:pointer;
+  }
+  .cart-fab .badge{
+    position:absolute; top:-4px; right:-4px; background:var(--danger); color:#fff; font-size:10px;
+    border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  }
+
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังตรวจสอบสิทธิ์...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(session.role !== 'admin' && !(session.permissions && session.permissions.sell)){
+  app.innerHTML = `<div class="blocked"><h1>ไม่มีสิทธิ์ขายสินค้า</h1><p>บัญชีนี้ไม่ได้รับสิทธิ์ "ขาย" กรุณาติดต่อแอดมิน</p><br><a href="login.html" style="color:#3b82f6;">กลับหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let branchOptions = [];
+let currentBranch = null;
+let productsCache = {};
+let cart = {}; // productId -> {name, price, qty, discount, unit}
+
+function boot(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    buildBranchOptions();
+    renderShell();
+  });
+}
+
+function buildBranchOptions(){
+  branchOptions = [];
+  Object.keys(shopsCache).forEach(shopId=>{
+    const shop = shopsCache[shopId];
+    const info = shop.info || {};
+    const branches = shop.branches || {};
+    const branchIds = Object.keys(branches);
+    let allowed = branchIds;
+    if(session.role !== 'admin'){
+      const access = session.access || {};
+      if(!access[shopId]) return;
+      allowed = branchIds.filter(bid => access[shopId][bid]);
+    }
+    allowed.forEach(bid=>{
+      branchOptions.push({ shopId, shopName: info.name, branchId: bid, branchName: branches[bid].name });
+    });
+  });
+  if(!currentBranch && branchOptions.length){
+    currentBranch = { shopId: branchOptions[0].shopId, branchId: branchOptions[0].branchId };
+  }
+}
+
+function renderShell(){
+  const roleLabel = {admin:'ADMIN', owner:'OWNER', staff:'STAFF'}[session.role] || session.role;
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <h1>🛒 ขายสินค้า</h1>
+        <div class="who">${session.name}<br><span style="color:#93c5fd">${roleLabel}</span></div>
+      </div>
+      <div class="shop-select" id="shopSelect"></div>
+      <div id="mainContent"></div>
+    </div>
+    <div class="cart-fab" id="cartFab" onclick="toggleCart(true)">🧺<span class="badge" id="cartBadge">0</span></div>
+  `;
+  renderShopSelect();
+  renderMainContent();
+}
+
+function renderShopSelect(){
+  const wrap = document.getElementById('shopSelect');
+  if(branchOptions.length === 0){
+    wrap.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขาที่เข้าถึงได้</div>`;
+    return;
+  }
+  wrap.innerHTML = branchOptions.map(b=>{
+    const active = currentBranch && currentBranch.shopId===b.shopId && currentBranch.branchId===b.branchId;
+    return `<div class="shop-chip ${active?'active':''}" data-shop="${b.shopId}" data-branch="${b.branchId}">${b.shopName} · ${b.branchName}</div>`;
+  }).join('');
+  document.querySelectorAll('.shop-chip').forEach(el=>{
+    el.onclick = ()=>{
+      currentBranch = { shopId: el.dataset.shop, branchId: el.dataset.branch };
+      cart = {};
+      renderShopSelect();
+      renderMainContent();
+    };
+  });
+}
+
+function renderMainContent(){
+  const content = document.getElementById('mainContent');
+  if(!currentBranch){
+    content.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขาให้ขายสินค้า — ไปเพิ่มร้านที่ shops.html ก่อน</div>`;
+    return;
+  }
+  content.innerHTML = `
+    <div class="search-row">
+      <input type="text" id="searchBox" placeholder="🔍 ค้นหาชื่อสินค้า หรือรหัส/บาร์โค้ด">
+      <div class="scan-btn" id="scanBtn">📷</div>
+    </div>
+    <div id="productGrid" class="product-grid"></div>
+  `;
+  document.getElementById('searchBox').oninput = renderProductGrid;
+  document.getElementById('scanBtn').onclick = ()=>{
+    const code = prompt('พิมพ์บาร์โค้ดสินค้า (จำลองการสแกน):');
+    if(code){
+      document.getElementById('searchBox').value = code;
+      renderProductGrid();
+    }
+  };
+
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/products`;
+  db.ref(basePath).on('value', snap=>{
+    productsCache = snap.val() || {};
+    renderProductGrid();
+  });
+
+  renderCart();
+}
+
+function renderProductGrid(){
+  const grid = document.getElementById('productGrid');
+  if(!grid) return;
+  const q = (document.getElementById('searchBox').value || '').trim().toLowerCase();
+  const ids = Object.keys(productsCache).filter(id=>{
+    const p = productsCache[id];
+    if(!q) return true;
+    return (p.name||'').toLowerCase().includes(q) || (p.barcode||'').toLowerCase().includes(q);
+  });
+
+  if(Object.keys(productsCache).length === 0){
+    grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1">ร้าน/สาขานี้ยังไม่มีสินค้า — หน้า "เพิ่มสินค้า" ยังไม่ถูกสร้าง (ขั้นตอนถัดไป) ตอนนี้ยังทดสอบขายไม่ได้จนกว่าจะมีสินค้า</div>`;
+    return;
+  }
+  if(ids.length === 0){
+    grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1">ไม่พบสินค้าที่ค้นหา</div>`;
+    return;
+  }
+
+  grid.innerHTML = ids.map(id=>{
+    const p = productsCache[id];
+    const stock = p.stock ?? 0;
+    const reorder = p.reorderPoint ?? 0;
+    let stockClass = '', stockLabel = `คงเหลือ ${stock}`;
+    if(stock <= 0){ stockClass='out'; stockLabel='สินค้าหมด'; }
+    else if(stock <= reorder){ stockClass='low'; stockLabel=`ใกล้หมด (${stock})`; }
+    return `<div class="product-card" data-id="${id}">
+      <div class="pname">${p.name||'(ไม่มีชื่อ)'}</div>
+      <div class="pmeta">${p.category||'ไม่ระบุหมวด'}</div>
+      <div class="pprice">฿${(p.sellPrice||0).toLocaleString()}</div>
+      <div class="pstock ${stockClass}">${stockLabel}</div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.product-card').forEach(el=>{
+    el.onclick = ()=> addToCart(el.dataset.id);
+  });
+}
+
+function addToCart(productId){
+  const p = productsCache[productId];
+  if(!p) return;
+  if((p.stock||0) <= 0){ alert('สินค้านี้หมดสต็อกแล้ว'); return; }
+  if(!cart[productId]){
+    cart[productId] = { name:p.name, price:p.sellPrice||0, qty:1, discount:0, unit:p.unit||'' };
+  } else {
+    if(cart[productId].qty + 1 > (p.stock||0)){ alert('จำนวนเกินสต็อกที่มี'); return; }
+    cart[productId].qty += 1;
+  }
+  renderCart();
+  toggleCart(true);
+}
+
+function changeQty(productId, delta){
+  const p = productsCache[productId];
+  const line = cart[productId];
+  if(!line) return;
+  const newQty = line.qty + delta;
+  if(newQty <= 0){ delete cart[productId]; }
+  else if(p && newQty > (p.stock||0)){ alert('จำนวนเกินสต็อกที่มี'); return; }
+  else { line.qty = newQty; }
+  renderCart();
+}
+
+function removeLine(productId){
+  delete cart[productId];
+  renderCart();
+}
+
+function toggleCart(show){
+  const panel = document.getElementById('cartPanel');
+  const fab = document.getElementById('cartFab');
+  if(!panel) return;
+  const count = Object.keys(cart).length;
+  if(show && count > 0){
+    panel.style.display = 'flex';
+    fab.style.display = 'none';
+  } else {
+    panel.style.display = 'none';
+    fab.style.display = count > 0 ? 'flex' : 'none';
+  }
+}
+
+function renderCart(){
+  let panel = document.getElementById('cartPanel');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'cartPanel';
+    panel.className = 'cart-panel';
+    panel.style.display = 'none';
+    document.body.appendChild(panel);
+  }
+
+  const ids = Object.keys(cart);
+  const badge = document.getElementById('cartBadge');
+  if(badge) badge.textContent = ids.reduce((s,id)=>s+cart[id].qty,0);
+
+  if(ids.length === 0){
+    panel.style.display = 'none';
+    document.getElementById('cartFab').style.display = 'none';
+    return;
+  }
+  document.getElementById('cartFab').style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+
+  let subtotal = 0;
+  const linesHtml = ids.map(id=>{
+    const line = cart[id];
+    const lineTotal = Math.max(0, (line.price * line.qty) - (line.discount||0));
+    subtotal += lineTotal;
+    return `<div class="cart-line">
+      <div class="cinfo">
+        <div class="cname">${line.name}</div>
+        <div class="cprice">฿${line.price.toLocaleString()} ${line.unit}</div>
+      </div>
+      <div class="qty-ctrl">
+        <button data-act="minus" data-id="${id}">−</button>
+        <div class="qn">${line.qty}</div>
+        <button data-act="plus" data-id="${id}">+</button>
+      </div>
+      <div class="cline-total">฿${lineTotal.toLocaleString()}</div>
+      <div class="cline-del" data-act="del" data-id="${id}">✕</div>
+    </div>`;
+  }).join('');
+
+  const billDiscountInput = panel.querySelector('#billDiscount');
+  const billDiscount = billDiscountInput ? (parseFloat(billDiscountInput.value)||0) : (window.__billDiscount||0);
+  const grandTotal = Math.max(0, subtotal - billDiscount);
+
+  panel.innerHTML = `
+    <div class="cart-head">
+      <h3>🧺 รายการในบิล</h3>
+      <span class="cart-count">${ids.length} รายการ</span>
+      <span style="color:#64748b; cursor:pointer;" onclick="toggleCart(false)">▾ ย่อ</span>
+    </div>
+    <div class="cart-items">${linesHtml}</div>
+    <div class="discount-row">
+      <label>ส่วนลดทั้งบิล (บาท)</label>
+      <input type="number" id="billDiscount" min="0" value="${billDiscount}">
+    </div>
+    <div class="cart-summary"><span>ยอดรวมสินค้า</span><span>฿${subtotal.toLocaleString()}</span></div>
+    <div class="cart-summary"><span>ส่วนลดบิล</span><span>-฿${billDiscount.toLocaleString()}</span></div>
+    <div class="cart-summary grand"><span>ยอดสุทธิ</span><span>฿${grandTotal.toLocaleString()}</span></div>
+    <button class="pay-btn" id="goPayBtn">ไปหน้าชำระเงิน</button>
+  `;
+  panel.style.display = 'flex';
+
+  panel.querySelectorAll('[data-act]').forEach(el=>{
+    el.onclick = ()=>{
+      const id = el.dataset.id;
+      if(el.dataset.act === 'plus') changeQty(id, 1);
+      if(el.dataset.act === 'minus') changeQty(id, -1);
+      if(el.dataset.act === 'del') removeLine(id);
+    };
+  });
+  document.getElementById('billDiscount').oninput = (e)=>{
+    window.__billDiscount = parseFloat(e.target.value)||0;
+    renderCart();
+  };
+  document.getElementById('goPayBtn').onclick = ()=>{
+    alert('หน้าชำระเงินยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)\\n\\nยอดที่จะส่งไปชำระ: ฿' + grandTotal.toLocaleString());
+  };
+}
+</script>
+</body>
+</html>
