@@ -222,7 +222,7 @@ function renderMainContent(){
     const code = prompt('พิมพ์บาร์โค้ดสินค้า (จำลองการสแกน):');
     if(code){ document.getElementById('searchBox').value = code; renderProductList(); }
   };
-  document.getElementById('addBtn').onclick = ()=> alert('หน้า "เพิ่มสินค้า" ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
+  document.getElementById('addBtn').onclick = ()=> location.href = 'addproduct.html';
 
   document.querySelectorAll('.filter-chip').forEach(el=>{
     el.onclick = ()=>{
@@ -248,7 +248,7 @@ function renderProductList(){
   let ids = Object.keys(productsCache);
 
   if(Object.keys(productsCache).length === 0){
-    listEl.innerHTML = `<div class="empty-note">ร้าน/สาขานี้ยังไม่มีสินค้า — กด "+ เพิ่มสินค้า" ด้านบน (หน้านั้นยังไม่ถูกสร้าง เป็นขั้นตอนถัดไป)</div>`;
+    listEl.innerHTML = `<div class="empty-note">ร้าน/สาขานี้ยังไม่มีสินค้า — กด "+ เพิ่มสินค้า" ด้านบนเพื่อเริ่มเพิ่ม</div>`;
     return;
   }
 

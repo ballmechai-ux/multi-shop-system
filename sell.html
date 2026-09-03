@@ -257,7 +257,7 @@ function renderProductGrid(){
   });
 
   if(Object.keys(productsCache).length === 0){
-    grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1">ร้าน/สาขานี้ยังไม่มีสินค้า — หน้า "เพิ่มสินค้า" ยังไม่ถูกสร้าง (ขั้นตอนถัดไป) ตอนนี้ยังทดสอบขายไม่ได้จนกว่าจะมีสินค้า</div>`;
+    grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1">ร้าน/สาขานี้ยังไม่มีสินค้า — ไปที่หน้า "เพิ่มสินค้า" (addproduct.html) เพื่อเพิ่มสินค้าก่อน</div>`;
     return;
   }
   if(ids.length === 0){
