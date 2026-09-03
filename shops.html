@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>จัดการร้านและสาขา</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:16px; padding-bottom:60px;
+  }
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    max-width:560px; margin:0 auto 18px;
+  }
+  .topbar h1{ font-family:'Kanit'; font-size:19px; }
+  .topbar .who{ font-size:12px; color:var(--sub); text-align:right; }
+  .wrap{ max-width:560px; margin:0 auto; }
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:18px;
+    padding:20px; margin-bottom:16px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  .card h2{ font-family:'Kanit'; font-size:16px; margin-bottom:14px; display:flex; align-items:center; gap:8px;}
+  input, select{
+    width:100%; padding:12px 13px; margin-bottom:10px; border-radius:12px;
+    border:1px solid var(--border); background:#0f172a; color:var(--text); font-size:14px;
+    font-family:'Sarabun';
+  }
+  label{ font-size:12.5px; color:var(--sub); display:block; margin-bottom:5px; }
+  .btn{
+    padding:12px 18px; border:none; border-radius:12px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:14.5px; font-weight:500; cursor:pointer; width:100%;
+  }
+  .btn:active{ background:var(--accent2); }
+  .btn.small{ width:auto; padding:8px 14px; font-size:13px; }
+  .btn.danger{ background:transparent; border:1px solid var(--danger); color:var(--danger); }
+  .btn.ghost{ background:transparent; border:1px solid var(--border); color:var(--sub); }
+  .msg{ font-size:13px; margin-top:8px; min-height:16px; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+  .shop-item{
+    background:#0f172a; border:1px solid var(--border); border-radius:14px;
+    padding:14px; margin-bottom:10px; cursor:pointer; transition:.1s;
+  }
+  .shop-item:active{ border-color:var(--accent); }
+  .shop-item .name{ font-family:'Kanit'; font-size:15.5px; }
+  .shop-item .type{
+    display:inline-block; font-size:11px; background:#2563eb33; color:#93c5fd;
+    padding:2px 9px; border-radius:20px; margin-top:6px; font-family:'Kanit';
+  }
+  .shop-item .meta{ font-size:12px; color:var(--sub); margin-top:6px; }
+  .branch-item{
+    background:#0f172a; border:1px solid var(--border); border-radius:12px;
+    padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .branch-item .bname{ font-family:'Kanit'; font-size:14px; }
+  .branch-item .baddr{ font-size:12px; color:var(--sub); margin-top:2px; }
+  .back-link{
+    color:var(--accent); font-size:13.5px; cursor:pointer; display:inline-block; margin-bottom:14px;
+  }
+  .empty{ text-align:center; color:var(--sub); font-size:13px; padding:20px 0; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+  .type-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+  .type-chip{
+    padding:10px; border-radius:12px; border:1px solid var(--border); background:#0f172a;
+    text-align:center; font-size:13px; cursor:pointer;
+  }
+  .type-chip.active{ border-color:var(--accent); background:#2563eb22; color:#93c5fd; }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังตรวจสอบสิทธิ์...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const SHOP_TYPES = ["ร้านขายของ","ร้านส้มตำ","ร้านน้ำปั่น","ร้านขายของชำ","อื่นๆ"];
+
+// ---------- Auth check ----------
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><p>กรุณาเข้าสู่ระบบก่อนใช้งานหน้านี้</p>
+    <br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(session.role !== 'admin'){
+  app.innerHTML = `<div class="blocked"><h1>ไม่มีสิทธิ์เข้าถึง</h1><p>หน้านี้สำหรับแอดมิน (ผู้ดูแลระบบ) เท่านั้น</p>
+    <br><a href="login.html" style="color:#3b82f6;">กลับหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let selectedShopId = null;
+let selectedType = SHOP_TYPES[0];
+
+function boot(){
+  renderShell();
+  loadShops();
+}
+
+function renderShell(){
+  app.innerHTML = `
+    <div class="topbar">
+      <h1>🏪 จัดการร้านและสาขา</h1>
+      <div class="who">${session.name}<br><span style="color:#93c5fd">ADMIN</span></div>
+    </div>
+    <div class="wrap" id="content"></div>
+  `;
+}
+
+function loadShops(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    if(selectedShopId && shopsCache[selectedShopId]){
+      renderShopDetail(selectedShopId);
+    } else {
+      selectedShopId = null;
+      renderShopList();
+    }
+  });
+}
+
+// ---------- Shop list + add shop ----------
+function renderShopList(){
+  const content = document.getElementById('content');
+  const ids = Object.keys(shopsCache);
+
+  const listHtml = ids.length === 0
+    ? `<div class="empty">ยังไม่มีร้านในระบบ เพิ่มร้านแรกได้ด้านล่าง</div>`
+    : ids.map(id=>{
+        const s = shopsCache[id].info || {};
+        const branchCount = Object.keys(shopsCache[id].branches || {}).length;
+        return `<div class="shop-item" data-id="${id}">
+          <div class="name">${s.name || '(ไม่มีชื่อ)'}</div>
+          <div class="type">${s.type || '-'}</div>
+          <div class="meta">${branchCount} สาขา</div>
+        </div>`;
+      }).join('');
+
+  content.innerHTML = `
+    <div class="card">
+      <h2>รายชื่อร้านทั้งหมด</h2>
+      ${listHtml}
+    </div>
+    <div class="card">
+      <h2>➕ เพิ่มร้านใหม่</h2>
+      <label>ชื่อร้าน</label>
+      <input id="newShopName" placeholder="เช่น ร้านลุงบุญมี">
+      <label>ประเภทร้าน</label>
+      <div class="type-grid" id="typeGrid"></div>
+      <button class="btn" id="addShopBtn">เพิ่มร้าน</button>
+      <div class="msg" id="shopMsg"></div>
+    </div>
+  `;
+
+  document.querySelectorAll('.shop-item').forEach(el=>{
+    el.onclick = ()=>{ selectedShopId = el.dataset.id; renderShopDetail(selectedShopId); };
+  });
+
+  const typeGrid = document.getElementById('typeGrid');
+  typeGrid.innerHTML = SHOP_TYPES.map(t=>
+    `<div class="type-chip ${t===selectedType?'active':''}" data-type="${t}">${t}</div>`
+  ).join('');
+  document.querySelectorAll('.type-chip').forEach(el=>{
+    el.onclick = ()=>{
+      selectedType = el.dataset.type;
+      document.querySelectorAll('.type-chip').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active');
+    };
+  });
+
+  document.getElementById('addShopBtn').onclick = addShop;
+}
+
+function addShop(){
+  const name = document.getElementById('newShopName').value.trim();
+  const msg = document.getElementById('shopMsg');
+  msg.className = 'msg error';
+  if(!name){ msg.textContent = 'กรุณากรอกชื่อร้าน'; return; }
+
+  const ref = db.ref('shops').push();
+  ref.set({
+    info: { name, type: selectedType, ownerUid: null, createdAt: Date.now() },
+    branches: {}
+  }).then(()=>{
+    msg.className = 'msg ok';
+    msg.textContent = 'เพิ่มร้านสำเร็จ';
+    document.getElementById('newShopName').value = '';
+  }).catch(err=>{
+    msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  });
+}
+
+// ---------- Shop detail: branches ----------
+function renderShopDetail(shopId){
+  const content = document.getElementById('content');
+  const shop = shopsCache[shopId];
+  const info = shop.info || {};
+  const branches = shop.branches || {};
+  const branchIds = Object.keys(branches);
+
+  const branchHtml = branchIds.length === 0
+    ? `<div class="empty">ร้านนี้ยังไม่มีสาขา เพิ่มสาขาแรกด้านล่าง</div>`
+    : branchIds.map(bid=>{
+        const b = branches[bid];
+        return `<div class="branch-item">
+          <div>
+            <div class="bname">${b.name}</div>
+            <div class="baddr">${b.address || 'ไม่ระบุที่อยู่'}${b.phone ? ' · ' + b.phone : ''}</div>
+          </div>
+          <button class="btn danger small" data-bid="${bid}" data-action="delBranch">ลบ</button>
+        </div>`;
+      }).join('');
+
+  content.innerHTML = `
+    <span class="back-link" id="backBtn">← กลับไปรายชื่อร้าน</span>
+    <div class="card">
+      <h2>🏪 ${info.name} <span class="type" style="margin-top:0">${info.type}</span></h2>
+      <button class="btn danger small" id="delShopBtn">ลบร้านนี้ทั้งหมด</button>
+    </div>
+    <div class="card">
+      <h2>สาขาในร้านนี้ (${branchIds.length})</h2>
+      ${branchHtml}
+    </div>
+    <div class="card">
+      <h2>➕ เพิ่มสาขาใหม่</h2>
+      <label>ชื่อสาขา</label>
+      <input id="newBranchName" placeholder="เช่น สาขาตลาดสด, สาขา 2">
+      <label>ที่อยู่ (ไม่บังคับ)</label>
+      <input id="newBranchAddr" placeholder="ที่อยู่สาขา">
+      <label>เบอร์โทร (ไม่บังคับ)</label>
+      <input id="newBranchPhone" placeholder="เบอร์โทรสาขา">
+      <button class="btn" id="addBranchBtn">เพิ่มสาขา</button>
+      <div class="msg" id="branchMsg"></div>
+    </div>
+  `;
+
+  document.getElementById('backBtn').onclick = ()=>{ selectedShopId=null; renderShopList(); };
+  document.getElementById('addBranchBtn').onclick = ()=> addBranch(shopId);
+  document.getElementById('delShopBtn').onclick = ()=> deleteShop(shopId, info.name);
+  document.querySelectorAll('[data-action="delBranch"]').forEach(btn=>{
+    btn.onclick = ()=> deleteBranch(shopId, btn.dataset.bid);
+  });
+}
+
+function addBranch(shopId){
+  const name = document.getElementById('newBranchName').value.trim();
+  const address = document.getElementById('newBranchAddr').value.trim();
+  const phone = document.getElementById('newBranchPhone').value.trim();
+  const msg = document.getElementById('branchMsg');
+  msg.className = 'msg error';
+  if(!name){ msg.textContent = 'กรุณากรอกชื่อสาขา'; return; }
+
+  const ref = db.ref(`shops/${shopId}/branches`).push();
+  ref.set({ name, address, phone, createdAt: Date.now() }).then(()=>{
+    msg.className = 'msg ok';
+    msg.textContent = 'เพิ่มสาขาสำเร็จ';
+  }).catch(err=>{
+    msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  });
+}
+
+function deleteBranch(shopId, branchId){
+  if(!confirm('ยืนยันลบสาขานี้? ข้อมูลในสาขาจะหายทั้งหมด')) return;
+  db.ref(`shops/${shopId}/branches/${branchId}`).remove();
+}
+
+function deleteShop(shopId, name){
+  if(!confirm(`ยืนยันลบร้าน "${name}" ทั้งหมด รวมทุกสาขาและข้อมูลข้างใน? การกระทำนี้ย้อนกลับไม่ได้`)) return;
+  db.ref(`shops/${shopId}`).remove().then(()=>{
+    selectedShopId = null;
+    renderShopList();
+  });
+}
+</script>
+</body>
+</html>
