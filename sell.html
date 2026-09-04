@@ -24,6 +24,14 @@
   .topbar .who{ font-size:11px; color:var(--sub); text-align:right; }
   .wrap{ max-width:900px; margin:0 auto; }
 
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+  }
+  .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
   .shop-select{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
   .shop-select::-webkit-scrollbar{ display:none; }
   .shop-chip{
@@ -111,6 +119,24 @@
 
   .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
   .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); display:none;
+    align-items:flex-end; justify-content:center; z-index:60;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-sheet{
+    background:#0b1222; border-radius:22px 22px 0 0; width:100%; max-width:600px;
+    padding:20px; max-height:85vh; overflow-y:auto;
+  }
+  .modal-sheet h2{ font-family:'Kanit'; font-size:16px; margin-bottom:14px; }
+  .opt-section{ margin-bottom:14px; }
+  .opt-title{ font-size:12.5px; color:var(--sub); margin-bottom:8px; }
+  .opt-radio, .opt-check{
+    display:flex; align-items:center; gap:8px; padding:9px 0; font-size:14px; border-bottom:1px solid var(--border);
+  }
+  .opt-radio input, .opt-check input{ width:auto; margin:0; }
+  .opt-total{ font-family:'Kanit'; font-size:18px; text-align:right; margin-top:8px; color:#93c5fd; }
 </style>
 </head>
 <body>
@@ -146,7 +172,7 @@ let shopsCache = {};
 let branchOptions = [];
 let currentBranch = null;
 let productsCache = {};
-let cart = {}; // productId -> {name, price, qty, discount, unit}
+let cart = {}; // cartKey -> {productId, name, price, qty, discount, unit}
 
 function boot(){
   db.ref('shops').on('value', snap=>{
@@ -191,8 +217,26 @@ function renderShell(){
     </div>
     <div class="cart-fab" id="cartFab" onclick="toggleCart(true)">🧺<span class="badge" id="cartBadge">0</span></div>
   `;
+  renderNavBar('sell.html');
   renderShopSelect();
   renderMainContent();
+}
+
+function renderNavBar(activePage){
+  const wrap = document.createElement('div');
+  wrap.className = 'nav-bar';
+  wrap.id = 'navBar';
+  document.getElementById('shopSelect').before(wrap);
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+  ];
+  wrap.innerHTML = items.filter(i=>i.show).map(i=>
+    `<a class="nav-item ${i.href===activePage?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
 }
 
 function renderShopSelect(){
@@ -289,29 +333,106 @@ function addToCart(productId){
   const p = productsCache[productId];
   if(!p) return;
   if((p.stock||0) <= 0){ alert('สินค้านี้หมดสต็อกแล้ว'); return; }
-  if(!cart[productId]){
-    cart[productId] = { name:p.name, price:p.sellPrice||0, qty:1, discount:0, unit:p.unit||'' };
+  const hasOptions = (p.sizeOptions && p.sizeOptions.length) || (p.addOnOptions && p.addOnOptions.length);
+  if(hasOptions){
+    openOptionsModal(productId);
   } else {
-    if(cart[productId].qty + 1 > (p.stock||0)){ alert('จำนวนเกินสต็อกที่มี'); return; }
-    cart[productId].qty += 1;
+    addResolvedToCart(productId, productId, p.name, p.sellPrice||0);
+  }
+}
+
+function addResolvedToCart(productId, cartKey, name, price){
+  const p = productsCache[productId];
+  const existingQty = cart[cartKey] ? cart[cartKey].qty : 0;
+  if(existingQty + 1 > (p.stock||0)){ alert('จำนวนเกินสต็อกที่มี'); return; }
+  if(!cart[cartKey]){
+    cart[cartKey] = { productId, name, price, qty:1, discount:0, unit:p.unit||'' };
+  } else {
+    cart[cartKey].qty += 1;
   }
   renderCart();
   toggleCart(true);
 }
 
-function changeQty(productId, delta){
+function openOptionsModal(productId){
   const p = productsCache[productId];
-  const line = cart[productId];
+  let overlay = document.getElementById('optModalOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'optModalOverlay';
+    overlay.className = 'modal-overlay';
+    document.body.appendChild(overlay);
+    overlay.onclick = (e)=>{ if(e.target.id === 'optModalOverlay') overlay.classList.remove('show'); };
+  }
+
+  const sizeHtml = (p.sizeOptions||[]).map((s,i)=>`
+    <label class="opt-radio">
+      <input type="radio" name="sizeOpt" value="${i}" ${i===0?'checked':''}>
+      ${s.name} ${s.delta ? (s.delta>0?'(+':'(') + s.delta.toLocaleString() + ')' : ''}
+    </label>
+  `).join('');
+
+  const addonHtml = (p.addOnOptions||[]).map((a,i)=>`
+    <label class="opt-check">
+      <input type="checkbox" name="addonOpt" value="${i}">
+      ${a.name} ${a.delta ? '(+'+a.delta.toLocaleString()+')' : ''}
+    </label>
+  `).join('');
+
+  overlay.innerHTML = `
+    <div class="modal-sheet">
+      <h2>${p.name}</h2>
+      ${sizeHtml ? `<div class="opt-section"><div class="opt-title">เลือกขนาด</div>${sizeHtml}</div>` : ''}
+      ${addonHtml ? `<div class="opt-section"><div class="opt-title">ตัวเลือกเสริม</div>${addonHtml}</div>` : ''}
+      <div class="opt-total">ราคา: <span id="optPriceVal">฿${(p.sellPrice||0).toLocaleString()}</span></div>
+      <button class="btn" id="optConfirmBtn" style="margin-top:10px">เพิ่มลงตะกร้า</button>
+      <button class="btn outline" id="optCancelBtn">ยกเลิก</button>
+    </div>
+  `;
+  overlay.classList.add('show');
+
+  const recalc = ()=>{
+    let price = p.sellPrice||0;
+    let labelParts = [];
+    const sizeSel = overlay.querySelector('input[name="sizeOpt"]:checked');
+    if(sizeSel){
+      const s = p.sizeOptions[parseInt(sizeSel.value)];
+      price += s.delta||0;
+      labelParts.push(s.name);
+    }
+    overlay.querySelectorAll('input[name="addonOpt"]:checked').forEach(cb=>{
+      const a = p.addOnOptions[parseInt(cb.value)];
+      price += a.delta||0;
+      labelParts.push(a.name);
+    });
+    document.getElementById('optPriceVal').textContent = '฿' + price.toLocaleString();
+    return { price, labelParts };
+  };
+
+  overlay.querySelectorAll('input').forEach(inp=> inp.onchange = recalc);
+  document.getElementById('optCancelBtn').onclick = ()=> overlay.classList.remove('show');
+  document.getElementById('optConfirmBtn').onclick = ()=>{
+    const { price, labelParts } = recalc();
+    const suffix = labelParts.length ? ` (${labelParts.join(', ')})` : '';
+    const cartKey = productId + '|' + labelParts.join(',');
+    addResolvedToCart(productId, cartKey, p.name + suffix, price);
+    overlay.classList.remove('show');
+  };
+}
+
+function changeQty(cartKey, delta){
+  const line = cart[cartKey];
   if(!line) return;
+  const p = productsCache[line.productId];
   const newQty = line.qty + delta;
-  if(newQty <= 0){ delete cart[productId]; }
+  if(newQty <= 0){ delete cart[cartKey]; }
   else if(p && newQty > (p.stock||0)){ alert('จำนวนเกินสต็อกที่มี'); return; }
   else { line.qty = newQty; }
   renderCart();
 }
 
-function removeLine(productId){
-  delete cart[productId];
+function removeLine(cartKey){
+  delete cart[cartKey];
   renderCart();
 }
 
@@ -406,7 +527,7 @@ function renderCart(){
   };
   document.getElementById('goPayBtn').onclick = ()=>{
     const items = ids.map(id=>({
-      productId:id, name:cart[id].name, price:cart[id].price,
+      productId: cart[id].productId, name:cart[id].name, price:cart[id].price,
       qty:cart[id].qty, discount:cart[id].discount||0, unit:cart[id].unit
     }));
     const pendingSale = {

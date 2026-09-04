@@ -66,6 +66,19 @@
   .profit-note{ font-size:12.5px; color:var(--sub); margin:-4px 0 10px; }
   .profit-note b{ color:var(--ok); }
 
+  .option-block{ background:#0f172a; border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .option-block h3{ font-family:'Kanit'; font-size:13.5px; margin-bottom:4px; }
+  .option-block .hint{ font-size:11.5px; color:var(--sub); margin-bottom:10px; }
+  .option-row{ display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+  .option-row input{ margin-bottom:0; }
+  .option-row input.oname{ flex:2; }
+  .option-row input.odelta{ flex:1; }
+  .option-row .odel{ color:var(--danger); font-size:16px; cursor:pointer; padding:0 4px; flex:0 0 auto; }
+  .add-option-btn{
+    background:transparent; border:1px dashed var(--border); border-radius:10px; color:var(--sub);
+    padding:8px; width:100%; font-size:12.5px; cursor:pointer;
+  }
+
   .btn{
     width:100%; padding:15px; border:none; border-radius:14px; background:var(--accent);
     color:#fff; font-family:'Kanit'; font-size:16px; font-weight:500; cursor:pointer; margin-top:6px;
@@ -236,6 +249,20 @@ function renderForm(){
         <div><label>จุดสั่งซื้อ (แจ้งเตือนใกล้หมด)</label><input id="pReorder" type="number" min="0" placeholder="0"></div>
       </div>
 
+      <div class="option-block">
+        <h3>📏 ตัวเลือกขนาด (ไม่บังคับ)</h3>
+        <div class="hint">เช่น เล็ก/กลาง/ใหญ่ — ใส่ส่วนต่างราคาจากราคาขายปกติ (ใส่ 0 ได้ถ้าราคาเท่ากัน)</div>
+        <div id="sizeRows"></div>
+        <div class="add-option-btn" id="addSizeBtn">+ เพิ่มขนาด</div>
+      </div>
+
+      <div class="option-block">
+        <h3>➕ ตัวเลือกเสริม / ท็อปปิ้ง (ไม่บังคับ)</h3>
+        <div class="hint">ลูกค้าเลือกได้หลายอย่าง ใส่ราคาเพิ่มต่อรายการ</div>
+        <div id="addonRows"></div>
+        <div class="add-option-btn" id="addAddonBtn">+ เพิ่มตัวเลือกเสริม</div>
+      </div>
+
       <button class="btn" id="saveBtn">💾 บันทึกสินค้า</button>
       <button class="btn outline" onclick="location.href='products.html'">ยกเลิก</button>
       <div class="msg" id="saveMsg"></div>
@@ -254,7 +281,59 @@ function renderForm(){
   document.getElementById('pCost').oninput = updateProfitNote;
   document.getElementById('pSell').oninput = updateProfitNote;
 
+  sizeOptions = [];
+  addOnOptions = [];
+  renderSizeRows();
+  renderAddonRows();
+  document.getElementById('addSizeBtn').onclick = ()=>{ sizeOptions.push({name:'', delta:0}); renderSizeRows(); };
+  document.getElementById('addAddonBtn').onclick = ()=>{ addOnOptions.push({name:'', delta:0}); renderAddonRows(); };
+
   document.getElementById('saveBtn').onclick = saveProduct;
+}
+
+let sizeOptions = [];
+let addOnOptions = [];
+
+function renderSizeRows(){
+  const wrap = document.getElementById('sizeRows');
+  wrap.innerHTML = sizeOptions.map((s,i)=>`
+    <div class="option-row">
+      <input class="oname" placeholder="ชื่อขนาด เช่น ใหญ่" value="${s.name}" data-i="${i}" data-f="name" data-type="size">
+      <input class="odelta" type="number" placeholder="+ราคา" value="${s.delta}" data-i="${i}" data-f="delta" data-type="size">
+      <span class="odel" data-i="${i}" data-type="size">✕</span>
+    </div>
+  `).join('');
+  bindOptionRowEvents();
+}
+
+function renderAddonRows(){
+  const wrap = document.getElementById('addonRows');
+  wrap.innerHTML = addOnOptions.map((a,i)=>`
+    <div class="option-row">
+      <input class="oname" placeholder="ชื่อ เช่น ไข่มุก" value="${a.name}" data-i="${i}" data-f="name" data-type="addon">
+      <input class="odelta" type="number" placeholder="+ราคา" value="${a.delta}" data-i="${i}" data-f="delta" data-type="addon">
+      <span class="odel" data-i="${i}" data-type="addon">✕</span>
+    </div>
+  `).join('');
+  bindOptionRowEvents();
+}
+
+function bindOptionRowEvents(){
+  document.querySelectorAll('.option-row input').forEach(inp=>{
+    inp.oninput = (e)=>{
+      const i = parseInt(e.target.dataset.i);
+      const f = e.target.dataset.f;
+      const arr = e.target.dataset.type === 'size' ? sizeOptions : addOnOptions;
+      arr[i][f] = f === 'delta' ? (parseFloat(e.target.value)||0) : e.target.value;
+    };
+  });
+  document.querySelectorAll('.odel').forEach(el=>{
+    el.onclick = ()=>{
+      const i = parseInt(el.dataset.i);
+      if(el.dataset.type === 'size'){ sizeOptions.splice(i,1); renderSizeRows(); }
+      else { addOnOptions.splice(i,1); renderAddonRows(); }
+    };
+  });
 }
 
 function updateProfitNote(){
@@ -286,6 +365,8 @@ function saveProduct(){
     vat: parseFloat(document.getElementById('pVat').value) || 0,
     stock: parseFloat(document.getElementById('pStock').value) || 0,
     reorderPoint: parseFloat(document.getElementById('pReorder').value) || 0,
+    sizeOptions: sizeOptions.filter(s=>s.name.trim()),
+    addOnOptions: addOnOptions.filter(a=>a.name.trim()),
     soldCount: 0,
     createdAt: Date.now(),
     createdBy: session.name
@@ -299,6 +380,10 @@ function saveProduct(){
       document.getElementById(id).value = '';
     });
     document.getElementById('imgPreview').innerHTML = 'ไม่มีรูปภาพ';
+    sizeOptions = [];
+    addOnOptions = [];
+    renderSizeRows();
+    renderAddonRows();
     updateProfitNote();
   }).catch(err=>{
     msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
