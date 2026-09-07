@@ -69,6 +69,19 @@
   .option-block{ background:#0f172a; border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:12px; }
   .option-block h3{ font-family:'Kanit'; font-size:13.5px; margin-bottom:4px; }
   .option-block .hint{ font-size:11.5px; color:var(--sub); margin-bottom:10px; }
+  .group-block{ background:#131f36; border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .group-head{ display:flex; gap:8px; margin-bottom:8px; }
+  .group-head input.gname{ flex:1; margin-bottom:0; }
+  .group-head select{ width:auto; margin-bottom:0; padding:10px 8px; }
+  .group-del{ color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; }
+  .choice-row{ display:flex; gap:8px; margin-bottom:6px; align-items:center; }
+  .choice-row input.cname{ flex:2; margin-bottom:0; }
+  .choice-row input.cdelta{ flex:1; margin-bottom:0; }
+  .choice-row .cdel{ color:var(--danger); font-size:15px; cursor:pointer; padding:0 4px; }
+  .add-choice-btn{
+    background:transparent; border:1px dashed var(--border); border-radius:8px; color:var(--sub);
+    padding:6px; width:100%; font-size:11.5px; cursor:pointer; margin-top:2px;
+  }
   .option-row{ display:flex; gap:8px; margin-bottom:8px; align-items:center; }
   .option-row input{ margin-bottom:0; }
   .option-row input.oname{ flex:2; }
@@ -250,17 +263,10 @@ function renderForm(){
       </div>
 
       <div class="option-block">
-        <h3>📏 ตัวเลือกขนาด (ไม่บังคับ)</h3>
-        <div class="hint">เช่น เล็ก/กลาง/ใหญ่ — ใส่ส่วนต่างราคาจากราคาขายปกติ (ใส่ 0 ได้ถ้าราคาเท่ากัน)</div>
-        <div id="sizeRows"></div>
-        <div class="add-option-btn" id="addSizeBtn">+ เพิ่มขนาด</div>
-      </div>
-
-      <div class="option-block">
-        <h3>➕ ตัวเลือกเสริม / ท็อปปิ้ง (ไม่บังคับ)</h3>
-        <div class="hint">ลูกค้าเลือกได้หลายอย่าง ใส่ราคาเพิ่มต่อรายการ</div>
-        <div id="addonRows"></div>
-        <div class="add-option-btn" id="addAddonBtn">+ เพิ่มตัวเลือกเสริม</div>
+        <h3>⚙️ กลุ่มตัวเลือกสินค้า (ไม่บังคับ)</h3>
+        <div class="hint">ใช้กับสินค้าที่มีตัวเลือกย่อย เช่น ขนาดแก้ว, เนื้อสัตว์ (เลือกได้อย่างเดียว), ท็อปปิ้ง/เพิ่มเติม (เลือกได้หลายอย่าง) — เพิ่มได้กี่กลุ่มก็ได้</div>
+        <div id="groupRows"></div>
+        <div class="add-option-btn" id="addGroupBtn">+ เพิ่มกลุ่มตัวเลือก</div>
       </div>
 
       <button class="btn" id="saveBtn">💾 บันทึกสินค้า</button>
@@ -281,57 +287,69 @@ function renderForm(){
   document.getElementById('pCost').oninput = updateProfitNote;
   document.getElementById('pSell').oninput = updateProfitNote;
 
-  sizeOptions = [];
-  addOnOptions = [];
-  renderSizeRows();
-  renderAddonRows();
-  document.getElementById('addSizeBtn').onclick = ()=>{ sizeOptions.push({name:'', delta:0}); renderSizeRows(); };
-  document.getElementById('addAddonBtn').onclick = ()=>{ addOnOptions.push({name:'', delta:0}); renderAddonRows(); };
+  optionGroups = [];
+  renderGroupRows();
+  document.getElementById('addGroupBtn').onclick = ()=>{
+    optionGroups.push({ name:'', type:'single', choices:[{name:'', delta:0}] });
+    renderGroupRows();
+  };
 
   document.getElementById('saveBtn').onclick = saveProduct;
 }
 
-let sizeOptions = [];
-let addOnOptions = [];
+let optionGroups = [];
 
-function renderSizeRows(){
-  const wrap = document.getElementById('sizeRows');
-  wrap.innerHTML = sizeOptions.map((s,i)=>`
-    <div class="option-row">
-      <input class="oname" placeholder="ชื่อขนาด เช่น ใหญ่" value="${s.name}" data-i="${i}" data-f="name" data-type="size">
-      <input class="odelta" type="number" placeholder="+ราคา" value="${s.delta}" data-i="${i}" data-f="delta" data-type="size">
-      <span class="odel" data-i="${i}" data-type="size">✕</span>
+function renderGroupRows(){
+  const wrap = document.getElementById('groupRows');
+  wrap.innerHTML = optionGroups.map((g,gi)=>`
+    <div class="group-block">
+      <div class="group-head">
+        <input class="gname" placeholder="ชื่อกลุ่ม เช่น เนื้อ, ไข่, ท็อปปิ้ง" value="${g.name}" data-gi="${gi}" data-f="gname">
+        <select data-gi="${gi}" data-f="gtype">
+          <option value="single" ${g.type==='single'?'selected':''}>เลือกได้อย่างเดียว</option>
+          <option value="multi" ${g.type==='multi'?'selected':''}>เลือกได้หลายอย่าง</option>
+        </select>
+        <span class="group-del" data-gi="${gi}">✕</span>
+      </div>
+      ${g.choices.map((c,ci)=>`
+        <div class="choice-row">
+          <input class="cname" placeholder="ชื่อตัวเลือก เช่น หมู" value="${c.name}" data-gi="${gi}" data-ci="${ci}" data-f="cname">
+          <input class="cdelta" type="number" placeholder="+ราคา" value="${c.delta}" data-gi="${gi}" data-ci="${ci}" data-f="cdelta">
+          <span class="cdel" data-gi="${gi}" data-ci="${ci}">✕</span>
+        </div>
+      `).join('')}
+      <div class="add-choice-btn" data-gi="${gi}">+ เพิ่มตัวเลือกย่อย</div>
     </div>
   `).join('');
-  bindOptionRowEvents();
+  bindGroupEvents();
 }
 
-function renderAddonRows(){
-  const wrap = document.getElementById('addonRows');
-  wrap.innerHTML = addOnOptions.map((a,i)=>`
-    <div class="option-row">
-      <input class="oname" placeholder="ชื่อ เช่น ไข่มุก" value="${a.name}" data-i="${i}" data-f="name" data-type="addon">
-      <input class="odelta" type="number" placeholder="+ราคา" value="${a.delta}" data-i="${i}" data-f="delta" data-type="addon">
-      <span class="odel" data-i="${i}" data-type="addon">✕</span>
-    </div>
-  `).join('');
-  bindOptionRowEvents();
-}
-
-function bindOptionRowEvents(){
-  document.querySelectorAll('.option-row input').forEach(inp=>{
-    inp.oninput = (e)=>{
-      const i = parseInt(e.target.dataset.i);
-      const f = e.target.dataset.f;
-      const arr = e.target.dataset.type === 'size' ? sizeOptions : addOnOptions;
-      arr[i][f] = f === 'delta' ? (parseFloat(e.target.value)||0) : e.target.value;
+function bindGroupEvents(){
+  document.querySelectorAll('.gname').forEach(el=>{
+    el.oninput = (e)=>{ optionGroups[e.target.dataset.gi].name = e.target.value; };
+  });
+  document.querySelectorAll('select[data-f="gtype"]').forEach(el=>{
+    el.onchange = (e)=>{ optionGroups[e.target.dataset.gi].type = e.target.value; };
+  });
+  document.querySelectorAll('.group-del').forEach(el=>{
+    el.onclick = ()=>{ optionGroups.splice(el.dataset.gi,1); renderGroupRows(); };
+  });
+  document.querySelectorAll('.cname, .cdelta').forEach(el=>{
+    el.oninput = (e)=>{
+      const gi = e.target.dataset.gi, ci = e.target.dataset.ci, f = e.target.dataset.f;
+      optionGroups[gi].choices[ci][f==='cname'?'name':'delta'] = f==='cname' ? e.target.value : (parseFloat(e.target.value)||0);
     };
   });
-  document.querySelectorAll('.odel').forEach(el=>{
+  document.querySelectorAll('.cdel').forEach(el=>{
     el.onclick = ()=>{
-      const i = parseInt(el.dataset.i);
-      if(el.dataset.type === 'size'){ sizeOptions.splice(i,1); renderSizeRows(); }
-      else { addOnOptions.splice(i,1); renderAddonRows(); }
+      optionGroups[el.dataset.gi].choices.splice(el.dataset.ci,1);
+      renderGroupRows();
+    };
+  });
+  document.querySelectorAll('.add-choice-btn').forEach(el=>{
+    el.onclick = ()=>{
+      optionGroups[el.dataset.gi].choices.push({name:'', delta:0});
+      renderGroupRows();
     };
   });
 }
@@ -365,8 +383,11 @@ function saveProduct(){
     vat: parseFloat(document.getElementById('pVat').value) || 0,
     stock: parseFloat(document.getElementById('pStock').value) || 0,
     reorderPoint: parseFloat(document.getElementById('pReorder').value) || 0,
-    sizeOptions: sizeOptions.filter(s=>s.name.trim()),
-    addOnOptions: addOnOptions.filter(a=>a.name.trim()),
+    sizeOptions: [],
+    addOnOptions: [],
+    optionGroups: optionGroups
+      .filter(g=>g.name.trim())
+      .map(g=>({ ...g, choices: g.choices.filter(c=>c.name.trim()) })),
     soldCount: 0,
     createdAt: Date.now(),
     createdBy: session.name
@@ -380,10 +401,8 @@ function saveProduct(){
       document.getElementById(id).value = '';
     });
     document.getElementById('imgPreview').innerHTML = 'ไม่มีรูปภาพ';
-    sizeOptions = [];
-    addOnOptions = [];
-    renderSizeRows();
-    renderAddonRows();
+    optionGroups = [];
+    renderGroupRows();
     updateProfitNote();
   }).catch(err=>{
     msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;

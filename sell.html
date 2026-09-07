@@ -410,12 +410,26 @@ function addToCart(productId){
   const p = productsCache[productId];
   if(!p) return;
   if((p.stock||0) <= 0){ alert('สินค้านี้หมดสต็อกแล้ว'); return; }
-  const hasOptions = (p.sizeOptions && p.sizeOptions.length) || (p.addOnOptions && p.addOnOptions.length);
-  if(hasOptions){
-    openOptionsModal(productId);
+  const groups = getEffectiveGroups(p);
+  if(groups.length > 0){
+    openOptionsModal(productId, groups);
   } else {
     addResolvedToCart(productId, productId, p.name, p.sellPrice||0);
   }
+}
+
+// Supports the new generalized optionGroups format, and falls back to the
+// legacy sizeOptions/addOnOptions fields for products created before that change.
+function getEffectiveGroups(p){
+  if(p.optionGroups && p.optionGroups.length) return p.optionGroups;
+  const groups = [];
+  if(p.sizeOptions && p.sizeOptions.length){
+    groups.push({ name:'ขนาด', type:'single', choices:p.sizeOptions });
+  }
+  if(p.addOnOptions && p.addOnOptions.length){
+    groups.push({ name:'ตัวเลือกเสริม', type:'multi', choices:p.addOnOptions });
+  }
+  return groups;
 }
 
 function addResolvedToCart(productId, cartKey, name, price){
@@ -431,7 +445,7 @@ function addResolvedToCart(productId, cartKey, name, price){
   toggleCart(true);
 }
 
-function openOptionsModal(productId){
+function openOptionsModal(productId, groups){
   const p = productsCache[productId];
   let overlay = document.getElementById('optModalOverlay');
   if(!overlay){
@@ -442,25 +456,21 @@ function openOptionsModal(productId){
     overlay.onclick = (e)=>{ if(e.target.id === 'optModalOverlay') overlay.classList.remove('show'); };
   }
 
-  const sizeHtml = (p.sizeOptions||[]).map((s,i)=>`
-    <label class="opt-radio">
-      <input type="radio" name="sizeOpt" value="${i}" ${i===0?'checked':''}>
-      ${s.name} ${s.delta ? (s.delta>0?'(+':'(') + s.delta.toLocaleString() + ')' : ''}
-    </label>
-  `).join('');
-
-  const addonHtml = (p.addOnOptions||[]).map((a,i)=>`
-    <label class="opt-check">
-      <input type="checkbox" name="addonOpt" value="${i}">
-      ${a.name} ${a.delta ? '(+'+a.delta.toLocaleString()+')' : ''}
-    </label>
-  `).join('');
+  const groupsHtml = groups.map((g,gi)=>{
+    const inputName = `grp${gi}`;
+    const choicesHtml = g.choices.map((c,ci)=>{
+      const priceLabel = c.delta ? (c.delta>0?' (+':' (') + c.delta.toLocaleString() + ')' : '';
+      return g.type === 'single'
+        ? `<label class="opt-radio"><input type="radio" name="${inputName}" value="${ci}" ${ci===0?'checked':''}>${c.name}${priceLabel}</label>`
+        : `<label class="opt-check"><input type="checkbox" name="${inputName}" value="${ci}">${c.name}${priceLabel}</label>`;
+    }).join('');
+    return `<div class="opt-section"><div class="opt-title">${g.name}${g.type==='single'?' (เลือก 1)':' (เลือกได้หลายอย่าง)'}</div>${choicesHtml}</div>`;
+  }).join('');
 
   overlay.innerHTML = `
     <div class="modal-sheet">
       <h2>${p.name}</h2>
-      ${sizeHtml ? `<div class="opt-section"><div class="opt-title">เลือกขนาด</div>${sizeHtml}</div>` : ''}
-      ${addonHtml ? `<div class="opt-section"><div class="opt-title">ตัวเลือกเสริม</div>${addonHtml}</div>` : ''}
+      ${groupsHtml}
       <div class="opt-total">ราคา: <span id="optPriceVal">฿${(p.sellPrice||0).toLocaleString()}</span></div>
       <button class="btn" id="optConfirmBtn" style="margin-top:10px">เพิ่มลงตะกร้า</button>
       <button class="btn outline" id="optCancelBtn">ยกเลิก</button>
@@ -471,16 +481,22 @@ function openOptionsModal(productId){
   const recalc = ()=>{
     let price = p.sellPrice||0;
     let labelParts = [];
-    const sizeSel = overlay.querySelector('input[name="sizeOpt"]:checked');
-    if(sizeSel){
-      const s = p.sizeOptions[parseInt(sizeSel.value)];
-      price += s.delta||0;
-      labelParts.push(s.name);
-    }
-    overlay.querySelectorAll('input[name="addonOpt"]:checked').forEach(cb=>{
-      const a = p.addOnOptions[parseInt(cb.value)];
-      price += a.delta||0;
-      labelParts.push(a.name);
+    groups.forEach((g,gi)=>{
+      const inputName = `grp${gi}`;
+      if(g.type === 'single'){
+        const sel = overlay.querySelector(`input[name="${inputName}"]:checked`);
+        if(sel){
+          const c = g.choices[parseInt(sel.value)];
+          price += c.delta||0;
+          labelParts.push(c.name);
+        }
+      } else {
+        overlay.querySelectorAll(`input[name="${inputName}"]:checked`).forEach(cb=>{
+          const c = g.choices[parseInt(cb.value)];
+          price += c.delta||0;
+          labelParts.push(c.name);
+        });
+      }
     });
     document.getElementById('optPriceVal').textContent = '฿' + price.toLocaleString();
     return { price, labelParts };
