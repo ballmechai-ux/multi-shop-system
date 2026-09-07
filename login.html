@@ -288,16 +288,16 @@ function loginSuccess(uid, user){
     <div class="success-screen">
       <div class="success-icon">✅</div>
       <h1>ยินดีต้อนรับ ${user.name}</h1>
-      <div class="info-line">เข้าสู่ระบบสำเร็จ กำลังไปที่ Dashboard...</div>
+      <div class="info-line">เข้าสู่ระบบสำเร็จ กำลังไปเลือกร้าน/สาขา...</div>
       <div class="info-box">
         <div>สิทธิ์การใช้งาน: <b>${roleLabel}</b> <span class="role-badge ${roleClass}">${user.role.toUpperCase()}</span></div>
         <div>เข้าถึงร้าน/สาขา: <b>${user.role==='admin' ? 'ทุกร้าน (Admin)' : (Object.keys(user.access||{}).length + ' รายการ')}</b></div>
       </div>
-      <button class="btn" style="margin-top:16px" onclick="location.href='dashboard.html'">ไปที่ Dashboard →</button>
+      <button class="btn" style="margin-top:16px" onclick="location.href='home.html'">เลือกร้าน/สาขา →</button>
       <button class="logout-btn" onclick="doLogout()">ออกจากระบบ</button>
     </div>
   `;
-  setTimeout(()=>{ location.href = 'dashboard.html'; }, 1200);
+  setTimeout(()=>{ location.href = 'home.html'; }, 1200);
 }
 
 function doLogout(){

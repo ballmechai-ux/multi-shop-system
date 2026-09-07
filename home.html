@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>เลือกร้าน/สาขา</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:18px; padding-bottom:60px;
+  }
+  .wrap{ max-width:640px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .topbar .name{ font-family:'Kanit'; font-size:16px; }
+  .topbar .badge{
+    display:inline-block; margin-top:2px; font-size:10px; padding:2px 9px; border-radius:20px;
+    background:#2563eb33; color:#93c5fd; font-family:'Kanit';
+  }
+  .topbar .logout{ font-size:12.5px; color:var(--sub); cursor:pointer; }
+
+  .step-title{ font-family:'Kanit'; font-size:17px; margin-bottom:4px; }
+  .step-sub{ font-size:12.5px; color:var(--sub); margin-bottom:16px; }
+  .back-link{ color:var(--accent); font-size:13px; cursor:pointer; display:inline-block; margin-bottom:14px; }
+
+  .shop-card, .action-card, .branch-card{
+    background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:16px; margin-bottom:12px; cursor:pointer; display:flex; align-items:center; gap:14px;
+  }
+  .shop-card:active, .action-card:active, .branch-card:active{ border-color:var(--accent); }
+  .shop-card .icon, .action-card .icon, .branch-card .icon{
+    width:46px; height:46px; border-radius:12px; background:#0f172a; display:flex; align-items:center;
+    justify-content:center; font-size:22px; flex:0 0 auto;
+  }
+  .shop-card .info, .action-card .info, .branch-card .info{ flex:1; min-width:0; }
+  .shop-card .sname, .action-card .aname, .branch-card .bname{ font-family:'Kanit'; font-size:15px; }
+  .shop-card .smeta, .branch-card .bmeta{ font-size:12px; color:var(--sub); margin-top:3px; }
+  .workflow-tag{
+    display:inline-block; font-size:10px; padding:2px 8px; border-radius:20px; margin-top:5px; font-family:'Kanit';
+  }
+  .workflow-tag.pos{ background:#22c55e33; color:#4ade80; }
+  .workflow-tag.kitchen{ background:#f59e0b33; color:#fbbf24; }
+  .chevron{ color:var(--sub); font-size:18px; }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:40px 20px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังโหลด...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let selectedShopId = null;
+let selectedBranchId = null;
+
+function boot(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    render();
+  });
+}
+
+function getAllowedShops(){
+  return Object.keys(shopsCache).filter(shopId=>{
+    if(session.role === 'admin') return true;
+    const access = session.access || {};
+    return !!access[shopId] && Object.values(access[shopId]).some(v=>v);
+  });
+}
+
+function getAllowedBranches(shopId){
+  const shop = shopsCache[shopId];
+  const branchIds = Object.keys(shop.branches || {});
+  if(session.role === 'admin') return branchIds;
+  const access = session.access || {};
+  return branchIds.filter(bid => access[shopId] && access[shopId][bid]);
+}
+
+function render(){
+  const roleLabel = {admin:'ADMIN', owner:'OWNER', staff:'STAFF'}[session.role] || session.role;
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <div>
+          <div class="name">${session.name}</div>
+          <span class="badge">${roleLabel}</span>
+        </div>
+        <span class="logout" onclick="doLogout()">ออกจากระบบ</span>
+      </div>
+      <div id="stepArea"></div>
+    </div>
+  `;
+  if(!selectedShopId){
+    renderShopStep();
+  } else if(!selectedBranchId){
+    renderBranchStep();
+  } else {
+    renderActionStep();
+  }
+}
+
+function renderShopStep(){
+  const area = document.getElementById('stepArea');
+  const shopIds = getAllowedShops();
+
+  area.innerHTML = `
+    <div class="step-title">เลือกร้าน</div>
+    <div class="step-sub">เลือกร้านที่ต้องการเข้าไปทำงาน</div>
+    <div id="shopList"></div>
+  `;
+  const list = document.getElementById('shopList');
+  if(shopIds.length === 0){
+    list.innerHTML = `<div class="empty-note">ยังไม่มีร้านที่คุณเข้าถึงได้ ติดต่อแอดมิน</div>`;
+    return;
+  }
+  list.innerHTML = shopIds.map(shopId=>{
+    const s = shopsCache[shopId].info || {};
+    const branchCount = getAllowedBranches(shopId).length;
+    const wf = s.workflow === 'kitchen' ? 'kitchen' : 'pos';
+    const wfLabel = wf === 'kitchen' ? '🍳 รับออเดอร์+ครัว' : '🛒 POS';
+    return `<div class="shop-card" data-shop="${shopId}">
+      <div class="icon">🏪</div>
+      <div class="info">
+        <div class="sname">${s.name}</div>
+        <div class="smeta">${s.type || ''} · ${branchCount} สาขา</div>
+        <span class="workflow-tag ${wf}">${wfLabel}</span>
+      </div>
+      <div class="chevron">›</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.shop-card').forEach(el=>{
+    el.onclick = ()=>{
+      selectedShopId = el.dataset.shop;
+      selectedBranchId = null;
+      render();
+    };
+  });
+}
+
+function renderBranchStep(){
+  const area = document.getElementById('stepArea');
+  const shop = shopsCache[selectedShopId];
+  const branchIds = getAllowedBranches(selectedShopId);
+
+  // Skip straight to action step if there's only one branch
+  if(branchIds.length === 1){
+    selectedBranchId = branchIds[0];
+    render();
+    return;
+  }
+
+  area.innerHTML = `
+    <span class="back-link" id="backToShop">← เปลี่ยนร้าน</span>
+    <div class="step-title">🏪 ${shop.info.name}</div>
+    <div class="step-sub">เลือกสาขา</div>
+    <div id="branchList"></div>
+  `;
+  document.getElementById('backToShop').onclick = ()=>{ selectedShopId = null; render(); };
+
+  const list = document.getElementById('branchList');
+  if(branchIds.length === 0){
+    list.innerHTML = `<div class="empty-note">ร้านนี้ยังไม่มีสาขาที่คุณเข้าถึงได้</div>`;
+    return;
+  }
+  list.innerHTML = branchIds.map(bid=>{
+    const b = shop.branches[bid];
+    return `<div class="branch-card" data-branch="${bid}">
+      <div class="icon">📍</div>
+      <div class="info">
+        <div class="bname">${b.name}</div>
+        <div class="bmeta">${b.address || 'ไม่ระบุที่อยู่'}</div>
+      </div>
+      <div class="chevron">›</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.branch-card').forEach(el=>{
+    el.onclick = ()=>{ selectedBranchId = el.dataset.branch; render(); };
+  });
+}
+
+function renderActionStep(){
+  const area = document.getElementById('stepArea');
+  const shop = shopsCache[selectedShopId];
+  const branch = shop.branches[selectedBranchId];
+  const isAdmin = session.role === 'admin';
+  const perms = session.permissions || {};
+
+  // Persist the selection so other pages default to it instead of resetting
+  localStorage.setItem('currentShopBranch', JSON.stringify({ shopId: selectedShopId, branchId: selectedBranchId }));
+
+  const branchPickerLink = getAllowedBranches(selectedShopId).length > 1
+    ? `<span class="back-link" id="backToBranch">← เปลี่ยนสาขา</span>`
+    : `<span class="back-link" id="backToShop2">← เปลี่ยนร้าน</span>`;
+
+  const actions = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: isAdmin || perms.sell },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'addproduct.html', icon:'➕', label:'เพิ่มสินค้า', show: isAdmin || perms.addProduct },
+    { href:'shops.html', icon:'🏪', label:'จัดการร้าน/สาขา', show: isAdmin },
+    { href:'staffs.html', icon:'👨‍💼', label:'จัดการพนักงาน', show: isAdmin }
+  ];
+
+  area.innerHTML = `
+    ${branchPickerLink}
+    <div class="step-title">📍 ${shop.info.name} · ${branch.name}</div>
+    <div class="step-sub">เลือกสิ่งที่ต้องการทำ</div>
+    <div id="actionList"></div>
+  `;
+  document.getElementById(getAllowedBranches(selectedShopId).length > 1 ? 'backToBranch' : 'backToShop2').onclick = ()=>{
+    if(getAllowedBranches(selectedShopId).length > 1){ selectedBranchId = null; } else { selectedShopId = null; selectedBranchId = null; }
+    render();
+  };
+
+  document.getElementById('actionList').innerHTML = actions.filter(a=>a.show).map(a=>
+    `<div class="action-card" data-href="${a.href}">
+      <div class="icon">${a.icon}</div>
+      <div class="info"><div class="aname">${a.label}</div></div>
+      <div class="chevron">›</div>
+    </div>`
+  ).join('');
+  document.querySelectorAll('.action-card').forEach(el=>{
+    el.onclick = ()=> location.href = el.dataset.href;
+  });
+}
+
+function doLogout(){
+  localStorage.removeItem('shopSession');
+  localStorage.removeItem('currentShopBranch');
+  localStorage.removeItem('pendingSale');
+  location.href = 'login.html';
+}
+</script>
+</body>
+</html>

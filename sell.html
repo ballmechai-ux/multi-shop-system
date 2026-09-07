@@ -238,8 +238,17 @@ function buildBranchOptions(){
     });
   });
   if(!currentBranch && branchOptions.length){
-    currentBranch = { shopId: branchOptions[0].shopId, branchId: branchOptions[0].branchId };
+    currentBranch = pickInitialBranch(branchOptions);
   }
+}
+
+function pickInitialBranch(options){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+  if(saved && options.some(b=>b.shopId===saved.shopId && b.branchId===saved.branchId)){
+    return { shopId: saved.shopId, branchId: saved.branchId };
+  }
+  return { shopId: options[0].shopId, branchId: options[0].branchId };
 }
 
 function renderShell(){
@@ -293,6 +302,7 @@ function renderShopSelect(){
   document.querySelectorAll('.shop-chip').forEach(el=>{
     el.onclick = ()=>{
       currentBranch = { shopId: el.dataset.shop, branchId: el.dataset.branch };
+      localStorage.setItem('currentShopBranch', JSON.stringify(currentBranch));
       cart = {};
       renderShopSelect();
       renderMainContent();
@@ -302,7 +312,7 @@ function renderShopSelect(){
     const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
     if(cur){
       banner.style.display = 'flex';
-      banner.innerHTML = `<span class="pin">📍</span> กำลังขายให้ร้าน: <b>${cur.shopName} · ${cur.branchName}</b>`;
+      banner.innerHTML = `<span class="pin">📍</span> กำลังขายให้ร้าน: <b>${cur.shopName} · ${cur.branchName}</b><a href="home.html" style="margin-left:auto; color:inherit; text-decoration:underline; font-size:12px;">🔄 เปลี่ยนร้าน</a>`;
     }
   }
 }
