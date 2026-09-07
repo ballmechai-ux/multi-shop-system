@@ -33,6 +33,11 @@
   .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
 
   .shop-select{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .current-shop-banner{
+    display:flex; align-items:center; gap:8px; background:#2563eb22; border:1px solid var(--accent);
+    border-radius:14px; padding:10px 14px; margin-bottom:12px; font-family:'Kanit'; font-size:14px; color:#93c5fd;
+  }
+  .current-shop-banner .pin{ font-size:16px; }
   .shop-select::-webkit-scrollbar{ display:none; }
   .shop-chip{
     flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
@@ -246,6 +251,7 @@ function renderShell(){
         <div class="who">${session.name}<br><span style="color:#93c5fd">${roleLabel}</span></div>
       </div>
       <div class="shop-select" id="shopSelect"></div>
+      <div class="current-shop-banner" id="currentShopBanner"></div>
       <div id="mainContent"></div>
     </div>
     <div class="cart-fab" id="cartFab" onclick="toggleCart(true)">🧺<span class="badge" id="cartBadge">0</span></div>
@@ -274,8 +280,10 @@ function renderNavBar(activePage){
 
 function renderShopSelect(){
   const wrap = document.getElementById('shopSelect');
+  const banner = document.getElementById('currentShopBanner');
   if(branchOptions.length === 0){
     wrap.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขาที่เข้าถึงได้</div>`;
+    if(banner) banner.style.display = 'none';
     return;
   }
   wrap.innerHTML = branchOptions.map(b=>{
@@ -290,6 +298,13 @@ function renderShopSelect(){
       renderMainContent();
     };
   });
+  if(banner && currentBranch){
+    const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
+    if(cur){
+      banner.style.display = 'flex';
+      banner.innerHTML = `<span class="pin">📍</span> กำลังขายให้ร้าน: <b>${cur.shopName} · ${cur.branchName}</b>`;
+    }
+  }
 }
 
 function renderMainContent(){

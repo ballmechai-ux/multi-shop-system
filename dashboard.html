@@ -88,6 +88,11 @@
   .shop-select{
     display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:4px;
   }
+  .current-shop-banner{
+    display:flex; align-items:center; gap:8px; background:var(--teal-dim); border:1px solid var(--teal);
+    border-radius:14px; padding:10px 14px; margin-bottom:14px; font-family:'Kanit'; font-size:14px; color:var(--teal);
+  }
+  .current-shop-banner .pin{ font-size:16px; }
   .shop-select::-webkit-scrollbar{ display:none; }
   .shop-chip{
     flex:0 0 auto; background:var(--panel); border:1px solid var(--border); border-radius:12px;
@@ -222,6 +227,7 @@ function renderShell(){
 
       <div class="nav-bar" id="navBar"></div>
       <div class="shop-select" id="shopSelect"></div>
+      <div class="current-shop-banner" id="currentShopBanner"></div>
 
       <div id="dashContent"></div>
 
@@ -251,8 +257,10 @@ function renderNavBar(activePage){
 
 function renderShopSelect(){
   const wrap = document.getElementById('shopSelect');
+  const banner = document.getElementById('currentShopBanner');
   if(branchOptions.length === 0){
     wrap.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขาที่เข้าถึงได้</div>`;
+    if(banner) banner.style.display = 'none';
     return;
   }
   wrap.innerHTML = branchOptions.map(b=>{
@@ -268,6 +276,13 @@ function renderShopSelect(){
       renderDashboardContent();
     };
   });
+  if(banner && currentBranch){
+    const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
+    if(cur){
+      banner.style.display = 'flex';
+      banner.innerHTML = `<span class="pin">📍</span> กำลังดูร้าน: <b>${cur.shopName} · ${cur.branchName}</b>`;
+    }
+  }
 }
 
 function renderDashboardContent(){
@@ -287,12 +302,7 @@ function renderDashboardContent(){
       <div class="kpi wide"><div><div class="icon">🏆</div><div class="label">สินค้าขายดีวันนี้</div></div><div class="value" id="bestSellerVal">-</div></div>
     </div>
 
-    <div class="quick-actions">
-      <div class="qa-btn" data-target="sell"><span class="qi">🛒</span>ขายสินค้า</div>
-      <div class="qa-btn" data-target="addproduct"><span class="qi">➕</span>เพิ่มสินค้า</div>
-      <div class="qa-btn" data-target="receive"><span class="qi">📥</span>รับสินค้าเข้า</div>
-      <div class="qa-btn" data-target="debt"><span class="qi">📒</span>รายการหนี้</div>
-    </div>
+    <div class="quick-actions" id="quickActions"></div>
 
     <div class="charts-row">
       <div class="panel">
@@ -314,14 +324,23 @@ function renderDashboardContent(){
     </div>
   `;
 
+  const isAdmin = session.role === 'admin';
+  const perms = session.permissions || {};
+  const qaItems = [
+    { target:'sell', icon:'🛒', label:'ขายสินค้า', show: isAdmin || perms.sell, href:'sell.html' },
+    { target:'addproduct', icon:'➕', label:'เพิ่มสินค้า', show: isAdmin || perms.addProduct, href:'addproduct.html' },
+    { target:'receive', icon:'📥', label:'รับสินค้าเข้า', show: true, href:null },
+    { target:'debt', icon:'📒', label:'รายการหนี้', show: true, href:null }
+  ];
+  document.getElementById('quickActions').innerHTML = qaItems.filter(i=>i.show).map(i=>
+    `<div class="qa-btn" data-target="${i.target}"><span class="qi">${i.icon}</span>${i.label}</div>`
+  ).join('');
+
   document.querySelectorAll('.qa-btn').forEach(btn=>{
-    const target = btn.dataset.target;
-    const links = { sell:'sell.html', addproduct:'addproduct.html' };
-    if(links[target]){
-      btn.onclick = ()=> location.href = links[target];
-    } else {
-      btn.onclick = ()=> alert('หน้านี้ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
-    }
+    const item = qaItems.find(i=>i.target === btn.dataset.target);
+    btn.onclick = item.href
+      ? ()=> location.href = item.href
+      : ()=> alert('หน้านี้ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
   });
 
   loadStatsAndCharts();
