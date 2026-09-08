@@ -242,6 +242,10 @@ function saveDebt(){
   debtRef.set(debtData).then(()=>{
     const promises = sale.items.map(it=>
       db.ref(`${basePath}/products/${it.productId}/stock`).transaction(cur=> Math.max(0, (cur||0) - it.qty))
+        .then(()=> db.ref(`${basePath}/stockLog`).push().set({
+          type:'sale', productId: it.productId, productName: it.name, qty: it.qty,
+          staffName: session.name, date: Date.now()
+        }))
     );
     return Promise.all(promises);
   }).then(()=>{

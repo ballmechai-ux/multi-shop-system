@@ -60,7 +60,12 @@
     padding:14px; margin-bottom:10px; cursor:pointer; transition:.1s;
   }
   .shop-item:active{ border-color:var(--accent); }
+  .shop-item .top-row{ display:flex; justify-content:space-between; align-items:flex-start; }
   .shop-item .name{ font-family:'Kanit'; font-size:15.5px; }
+  .shop-code{
+    font-family:'Kanit'; font-size:11.5px; background:#0f172a; border:1px solid var(--border);
+    color:#fbbf24; padding:2px 9px; border-radius:8px; letter-spacing:.5px; flex:0 0 auto;
+  }
   .shop-item .type{
     display:inline-block; font-size:11px; background:#2563eb33; color:#93c5fd;
     padding:2px 9px; border-radius:20px; margin-top:6px; font-family:'Kanit';
@@ -104,6 +109,13 @@ const db = firebase.database();
 const app = document.getElementById('app');
 
 const SHOP_TYPES = ["ร้านขายของ","ร้านส้มตำ","ร้านน้ำปั่น","ร้านขายของชำ","อื่นๆ"];
+const TYPE_PREFIX = {
+  "ร้านขายของ":"RT", "ร้านส้มตำ":"SM", "ร้านน้ำปั่น":"DR", "ร้านขายของชำ":"GR", "อื่นๆ":"OT"
+};
+const WORKFLOWS = [
+  { value:'pos', label:'🛒 ขายหน้าร้าน (POS)' },
+  { value:'kitchen', label:'🍳 รับออเดอร์ + ครัว (ตามสั่ง)' }
+];
 
 // ---------- Auth check ----------
 const sessionRaw = localStorage.getItem('shopSession');
@@ -123,6 +135,7 @@ if(!session){
 let shopsCache = {};
 let selectedShopId = null;
 let selectedType = SHOP_TYPES[0];
+let selectedWorkflow = 'pos';
 
 function boot(){
   renderShell();
@@ -147,6 +160,7 @@ function renderNavBar(activePage){
     { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
     { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show:true },
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
     { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show:true },
     { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show:true }
   ];
@@ -178,8 +192,12 @@ function renderShopList(){
         const s = shopsCache[id].info || {};
         const branchCount = Object.keys(shopsCache[id].branches || {}).length;
         return `<div class="shop-item" data-id="${id}">
-          <div class="name">${s.name || '(ไม่มีชื่อ)'}</div>
+          <div class="top-row">
+            <div class="name">${s.name || '(ไม่มีชื่อ)'}</div>
+            <span class="shop-code">${s.code || 'ไม่มีรหัส'}</span>
+          </div>
           <div class="type">${s.type || '-'}</div>
+          <div class="type" style="background:${s.workflow==='kitchen'?'#f59e0b33':'#22c55e33'}; color:${s.workflow==='kitchen'?'#fbbf24':'#4ade80'}">${s.workflow==='kitchen'?'🍳 ตามสั่ง':'🛒 POS'}</div>
           <div class="meta">${branchCount} สาขา</div>
         </div>`;
       }).join('');
@@ -195,6 +213,8 @@ function renderShopList(){
       <input id="newShopName" placeholder="เช่น ร้านลุงบุญมี">
       <label>ประเภทร้าน</label>
       <div class="type-grid" id="typeGrid"></div>
+      <label>รูปแบบการขาย</label>
+      <div class="type-grid" id="workflowGrid"></div>
       <button class="btn" id="addShopBtn">เพิ่มร้าน</button>
       <div class="msg" id="shopMsg"></div>
     </div>
@@ -216,6 +236,18 @@ function renderShopList(){
     };
   });
 
+  const workflowGrid = document.getElementById('workflowGrid');
+  workflowGrid.innerHTML = WORKFLOWS.map(w=>
+    `<div class="type-chip ${w.value===selectedWorkflow?'active':''}" data-wf="${w.value}">${w.label}</div>`
+  ).join('');
+  document.querySelectorAll('#workflowGrid .type-chip').forEach(el=>{
+    el.onclick = ()=>{
+      selectedWorkflow = el.dataset.wf;
+      document.querySelectorAll('#workflowGrid .type-chip').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active');
+    };
+  });
+
   document.getElementById('addShopBtn').onclick = addShop;
 }
 
@@ -225,14 +257,24 @@ function addShop(){
   msg.className = 'msg error';
   if(!name){ msg.textContent = 'กรุณากรอกชื่อร้าน'; return; }
 
-  const ref = db.ref('shops').push();
-  ref.set({
-    info: { name, type: selectedType, ownerUid: null, createdAt: Date.now() },
-    branches: {}
-  }).then(()=>{
-    msg.className = 'msg ok';
-    msg.textContent = 'เพิ่มร้านสำเร็จ';
-    document.getElementById('newShopName').value = '';
+  const prefix = TYPE_PREFIX[selectedType] || 'OT';
+
+  // Use a per-type counter (transaction = safe even if two people add shops
+  // of the same type at the same time) so each shop gets a unique, sequential
+  // audit code like DR-0001, DR-0002, ...
+  db.ref(`shopCounters/${prefix}`).transaction(cur => (cur||0) + 1).then(result=>{
+    const seq = result.snapshot.val();
+    const code = `${prefix}-${String(seq).padStart(4,'0')}`;
+
+    const ref = db.ref('shops').push();
+    return ref.set({
+      info: { name, type: selectedType, workflow: selectedWorkflow, code, ownerUid: null, createdAt: Date.now() },
+      branches: {}
+    }).then(()=>{
+      msg.className = 'msg ok';
+      msg.textContent = `เพิ่มร้านสำเร็จ — รหัสร้าน: ${code}`;
+      document.getElementById('newShopName').value = '';
+    });
   }).catch(err=>{
     msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
   });
@@ -262,7 +304,7 @@ function renderShopDetail(shopId){
   content.innerHTML = `
     <span class="back-link" id="backBtn">← กลับไปรายชื่อร้าน</span>
     <div class="card">
-      <h2>🏪 ${info.name} <span class="type" style="margin-top:0">${info.type}</span></h2>
+      <h2>🏪 ${info.name} <span class="shop-code">${info.code || 'ไม่มีรหัส'}</span> <span class="type" style="margin-top:0">${info.type}</span></h2>
       <button class="btn danger small" id="delShopBtn">ลบร้านนี้ทั้งหมด</button>
     </div>
     <div class="card">

@@ -220,9 +220,13 @@ function confirmPayment(status){
   };
 
   billRef.set(billData).then(()=>{
-    // decrement stock for each item
+    // decrement stock for each item, and log the movement for stock.html's history tab
     const promises = sale.items.map(it=>{
-      return db.ref(`${basePath}/products/${it.productId}/stock`).transaction(cur=> Math.max(0, (cur||0) - it.qty));
+      return db.ref(`${basePath}/products/${it.productId}/stock`).transaction(cur=> Math.max(0, (cur||0) - it.qty))
+        .then(()=> db.ref(`${basePath}/stockLog`).push().set({
+          type:'sale', productId: it.productId, productName: it.name, qty: it.qty,
+          staffName: session.name, date: Date.now()
+        }));
     });
     return Promise.all(promises);
   }).then(()=>{

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>สต็อกสินค้า</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --warn:#fbbf24; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:14px; padding-bottom:60px;
+  }
+  .wrap{ max-width:640px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .topbar h1{ font-family:'Kanit'; font-size:18px; }
+  .topbar .who{ font-size:11px; color:var(--sub); text-align:right; }
+
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+  }
+  .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .shop-select{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .shop-select::-webkit-scrollbar{ display:none; }
+  .shop-chip{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12.5px; color:var(--sub); cursor:pointer; white-space:nowrap;
+  }
+  .shop-chip.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+  .current-shop-banner{
+    display:flex; align-items:center; gap:8px; background:#2563eb22; border:1px solid var(--accent);
+    border-radius:14px; padding:10px 14px; margin-bottom:12px; font-family:'Kanit'; font-size:14px; color:#93c5fd;
+  }
+  .current-shop-banner .pin{ font-size:16px; }
+
+  .tabs{ display:flex; gap:8px; margin-bottom:14px; }
+  .tab-btn{
+    flex:1; text-align:center; padding:10px; border-radius:12px; border:1px solid var(--border);
+    background:var(--card); color:var(--sub); font-family:'Kanit'; font-size:13px; cursor:pointer;
+  }
+  .tab-btn.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .filter-row{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .filter-row::-webkit-scrollbar{ display:none; }
+  .filter-chip{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:7px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap;
+  }
+  .filter-chip.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .stock-item{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:13px 14px; margin-bottom:9px; display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .stock-item .pname{ font-family:'Kanit'; font-size:14.5px; }
+  .stock-item .pcat{ font-size:11.5px; color:var(--sub); margin-top:2px; }
+  .stock-item .pstock-val{ font-family:'Kanit'; font-size:18px; text-align:right; }
+  .stock-item .pstock-val.low{ color:var(--warn); }
+  .stock-item .pstock-val.out{ color:var(--danger); }
+  .stock-item .pstock-val.ok{ color:var(--ok); }
+  .adj-btn{
+    background:#0f172a; border:1px solid var(--border); border-radius:10px; color:var(--text);
+    padding:8px 12px; font-family:'Kanit'; font-size:12px; cursor:pointer; flex:0 0 auto;
+  }
+
+  .log-item{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:11px 14px; margin-bottom:8px;
+  }
+  .log-item .lhead{ display:flex; justify-content:space-between; font-family:'Kanit'; font-size:13.5px; }
+  .log-item .lmeta{ font-size:11.5px; color:var(--sub); margin-top:3px; }
+  .log-tag{
+    font-size:10px; padding:1px 8px; border-radius:20px; font-family:'Kanit'; margin-right:6px;
+  }
+  .log-tag.sale{ background:#3b82f633; color:#93c5fd; }
+  .log-tag.adjust-up{ background:#22c55e33; color:#4ade80; }
+  .log-tag.adjust-down{ background:#ef444433; color:#f87171; }
+  .log-tag.receive{ background:#fbbf2433; color:#fbbf24; }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:30px 14px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); display:none;
+    align-items:flex-end; justify-content:center; z-index:60;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-sheet{
+    background:#0b1222; border-radius:22px 22px 0 0; width:100%; max-width:600px;
+    padding:20px; max-height:85vh; overflow-y:auto;
+  }
+  .modal-sheet h2{ font-family:'Kanit'; font-size:16px; margin-bottom:14px; }
+  .modal-sheet label{ font-size:12.5px; color:var(--sub); display:block; margin-bottom:5px; }
+  .modal-sheet input, .modal-sheet select{
+    width:100%; padding:12px 13px; margin-bottom:10px; border-radius:12px;
+    border:1px solid var(--border); background:#0f172a; color:var(--text); font-size:14px; font-family:'Sarabun';
+  }
+  .adj-toggle{ display:flex; gap:8px; margin-bottom:10px; }
+  .adj-toggle div{
+    flex:1; text-align:center; padding:10px; border-radius:12px; border:1px solid var(--border);
+    background:#0f172a; cursor:pointer; font-family:'Kanit'; font-size:13px; color:var(--sub);
+  }
+  .adj-toggle div.active.up{ border-color:var(--ok); color:var(--ok); background:#22c55e22; }
+  .adj-toggle div.active.down{ border-color:var(--danger); color:var(--danger); background:#ef444422; }
+  .btn{
+    width:100%; padding:14px; border:none; border-radius:12px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:15px; font-weight:500; cursor:pointer; margin-top:6px;
+  }
+  .btn.outline{ background:transparent; border:1px solid var(--border); color:var(--sub); }
+  .msg{ font-size:13px; margin-top:8px; min-height:16px; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังตรวจสอบสิทธิ์...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let branchOptions = [];
+let currentBranch = null;
+let productsCache = {};
+let stockLogCache = {};
+let activeTab = 'overview'; // overview | history
+let activeFilter = 'all';
+
+function boot(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    buildBranchOptions();
+    renderShell();
+  });
+}
+
+function buildBranchOptions(){
+  branchOptions = [];
+  Object.keys(shopsCache).forEach(shopId=>{
+    const shop = shopsCache[shopId];
+    const info = shop.info || {};
+    const branches = shop.branches || {};
+    const branchIds = Object.keys(branches);
+    let allowed = branchIds;
+    if(session.role !== 'admin'){
+      const access = session.access || {};
+      if(!access[shopId]) return;
+      allowed = branchIds.filter(bid => access[shopId][bid]);
+    }
+    allowed.forEach(bid=>{
+      branchOptions.push({ shopId, shopName: info.name, branchId: bid, branchName: branches[bid].name });
+    });
+  });
+  if(!currentBranch && branchOptions.length){
+    currentBranch = pickInitialBranch(branchOptions);
+  }
+}
+
+function pickInitialBranch(options){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+  if(saved && options.some(b=>b.shopId===saved.shopId && b.branchId===saved.branchId)){
+    return { shopId: saved.shopId, branchId: saved.branchId };
+  }
+  return { shopId: options[0].shopId, branchId: options[0].branchId };
+}
+
+function renderShell(){
+  const roleLabel = {admin:'ADMIN', owner:'OWNER', staff:'STAFF'}[session.role] || session.role;
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <h1>📦 สต็อกสินค้า</h1>
+        <div class="who">${session.name}<br><span style="color:#93c5fd">${roleLabel}</span></div>
+      </div>
+      <div class="nav-bar" id="navBar"></div>
+      <div class="shop-select" id="shopSelect"></div>
+      <div class="current-shop-banner" id="currentShopBanner"></div>
+      <div id="mainContent"></div>
+    </div>
+    <div class="modal-overlay" id="modalOverlay"><div class="modal-sheet" id="modalSheet"></div></div>
+  `;
+  document.getElementById('modalOverlay').onclick = (e)=>{ if(e.target.id==='modalOverlay') closeModal(); };
+  renderNavBar();
+  renderShopSelect();
+  renderMainContent();
+}
+
+function renderNavBar(){
+  const wrap = document.getElementById('navBar');
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+  ];
+  wrap.innerHTML = items.filter(i=>i.show).map(i=>
+    `<a class="nav-item ${i.href==='stock.html'?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
+}
+
+function renderShopSelect(){
+  const wrap = document.getElementById('shopSelect');
+  const banner = document.getElementById('currentShopBanner');
+  if(branchOptions.length === 0){
+    wrap.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขาที่เข้าถึงได้</div>`;
+    if(banner) banner.style.display = 'none';
+    return;
+  }
+  wrap.innerHTML = branchOptions.map(b=>{
+    const active = currentBranch && currentBranch.shopId===b.shopId && currentBranch.branchId===b.branchId;
+    return `<div class="shop-chip ${active?'active':''}" data-shop="${b.shopId}" data-branch="${b.branchId}">${b.shopName} · ${b.branchName}</div>`;
+  }).join('');
+  document.querySelectorAll('.shop-chip').forEach(el=>{
+    el.onclick = ()=>{
+      currentBranch = { shopId: el.dataset.shop, branchId: el.dataset.branch };
+      localStorage.setItem('currentShopBranch', JSON.stringify(currentBranch));
+      renderShopSelect();
+      renderMainContent();
+    };
+  });
+  if(banner && currentBranch){
+    const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
+    if(cur){
+      banner.style.display = 'flex';
+      banner.innerHTML = `<span class="pin">📍</span> กำลังดูสต็อกร้าน: <b>${cur.shopName} · ${cur.branchName}</b><a href="home.html" style="margin-left:auto; color:inherit; text-decoration:underline; font-size:12px;">🔄 เปลี่ยนร้าน</a>`;
+    }
+  }
+}
+
+function renderMainContent(){
+  const content = document.getElementById('mainContent');
+  if(!currentBranch){
+    content.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขา — ไปเพิ่มร้านที่ shops.html ก่อน</div>`;
+    return;
+  }
+  content.innerHTML = `
+    <div class="tabs">
+      <div class="tab-btn ${activeTab==='overview'?'active':''}" data-tab="overview">📦 ภาพรวมสต็อก</div>
+      <div class="tab-btn ${activeTab==='history'?'active':''}" data-tab="history">🕓 ประวัติสต็อก</div>
+    </div>
+    <div id="tabContent"></div>
+  `;
+  document.querySelectorAll('.tab-btn').forEach(el=>{
+    el.onclick = ()=>{ activeTab = el.dataset.tab; renderMainContent(); };
+  });
+
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+  if(activeTab === 'overview'){
+    db.ref(basePath + '/products').on('value', snap=>{
+      productsCache = snap.val() || {};
+      renderOverviewTab();
+    });
+  } else {
+    db.ref(basePath + '/stockLog').limitToLast(100).on('value', snap=>{
+      stockLogCache = snap.val() || {};
+      renderHistoryTab();
+    });
+  }
+}
+
+function renderOverviewTab(){
+  const wrap = document.getElementById('tabContent');
+  if(!wrap) return;
+  wrap.innerHTML = `
+    <div class="filter-row" id="filterRow">
+      <div class="filter-chip ${activeFilter==='all'?'active':''}" data-f="all">สต็อกทั้งหมด</div>
+      <div class="filter-chip ${activeFilter==='low'?'active':''}" data-f="low">ใกล้หมด</div>
+      <div class="filter-chip ${activeFilter==='out'?'active':''}" data-f="out">หมด</div>
+    </div>
+    <div style="margin-bottom:12px">
+      <button class="btn outline" style="margin-top:0" id="goReceiveBtn">📥 ไปหน้ารับสินค้าเข้า</button>
+    </div>
+    <div id="stockList"></div>
+  `;
+  document.querySelectorAll('.filter-chip').forEach(el=>{
+    el.onclick = ()=>{ activeFilter = el.dataset.f; renderOverviewTab(); };
+  });
+  document.getElementById('goReceiveBtn').onclick = ()=>{
+    alert('หน้า "รับสินค้าเข้า" ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
+  };
+  renderStockList();
+}
+
+function renderStockList(){
+  const listEl = document.getElementById('stockList');
+  if(!listEl) return;
+  let ids = Object.keys(productsCache);
+  if(ids.length === 0){
+    listEl.innerHTML = `<div class="empty-note">ร้าน/สาขานี้ยังไม่มีสินค้า</div>`;
+    return;
+  }
+  ids = ids.filter(id=>{
+    const p = productsCache[id];
+    const stock = p.stock ?? 0;
+    const reorder = p.reorderPoint ?? 0;
+    if(activeFilter === 'low') return stock > 0 && stock <= reorder;
+    if(activeFilter === 'out') return stock <= 0;
+    return true;
+  });
+  if(ids.length === 0){
+    listEl.innerHTML = `<div class="empty-note">ไม่มีสินค้าตามเงื่อนไขนี้</div>`;
+    return;
+  }
+  listEl.innerHTML = ids.map(id=>{
+    const p = productsCache[id];
+    const stock = p.stock ?? 0;
+    const reorder = p.reorderPoint ?? 0;
+    let cls = 'ok';
+    if(stock <= 0) cls = 'out'; else if(stock <= reorder) cls = 'low';
+    return `<div class="stock-item">
+      <div>
+        <div class="pname">${p.name||'(ไม่มีชื่อ)'}</div>
+        <div class="pcat">${p.category||'ไม่ระบุหมวด'}</div>
+      </div>
+      <div class="pstock-val ${cls}">${stock} ${p.unit||''}</div>
+      <div class="adj-btn" data-id="${id}">ปรับสต็อก</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.adj-btn').forEach(el=>{
+    el.onclick = ()=> openAdjustModal(el.dataset.id);
+  });
+}
+
+let adjustDirection = 'up';
+
+function openAdjustModal(productId){
+  const p = productsCache[productId];
+  adjustDirection = 'up';
+  const sheet = document.getElementById('modalSheet');
+  sheet.innerHTML = `
+    <h2>ปรับสต็อก: ${p.name}</h2>
+    <div style="font-size:13px; color:var(--sub); margin-bottom:12px;">คงเหลือปัจจุบัน: <b style="color:var(--text)">${p.stock??0} ${p.unit||''}</b></div>
+    <div class="adj-toggle">
+      <div class="up active" data-dir="up">➕ เพิ่มสต็อก</div>
+      <div class="down" data-dir="down">➖ ลดสต็อก</div>
+    </div>
+    <label>จำนวน</label>
+    <input id="adjQty" type="number" min="1" placeholder="0">
+    <label>เหตุผล (ไม่บังคับ)</label>
+    <input id="adjReason" placeholder="เช่น นับสต็อกใหม่, สินค้าเสียหาย, รับของเพิ่ม">
+    <button class="btn" id="adjConfirmBtn">บันทึกการปรับสต็อก</button>
+    <button class="btn outline" id="adjCancelBtn">ยกเลิก</button>
+    <div class="msg" id="adjMsg"></div>
+  `;
+  document.querySelectorAll('.adj-toggle div').forEach(el=>{
+    el.onclick = ()=>{
+      adjustDirection = el.dataset.dir;
+      document.querySelectorAll('.adj-toggle div').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active');
+    };
+  });
+  document.getElementById('adjCancelBtn').onclick = closeModal;
+  document.getElementById('adjConfirmBtn').onclick = ()=> confirmAdjust(productId);
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function confirmAdjust(productId){
+  const qty = parseFloat(document.getElementById('adjQty').value) || 0;
+  const reason = document.getElementById('adjReason').value.trim();
+  const msg = document.getElementById('adjMsg');
+  msg.className = 'msg error';
+  if(qty <= 0){ msg.textContent = 'กรุณากรอกจำนวนให้ถูกต้อง'; return; }
+
+  const p = productsCache[productId];
+  const change = adjustDirection === 'up' ? qty : -qty;
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+
+  db.ref(`${basePath}/products/${productId}/stock`).transaction(cur => Math.max(0, (cur||0) + change)).then(()=>{
+    return db.ref(`${basePath}/stockLog`).push().set({
+      type: adjustDirection === 'up' ? 'adjust-up' : 'adjust-down',
+      productId, productName: p.name,
+      qty: qty, reason,
+      staffName: session.name,
+      date: Date.now()
+    });
+  }).then(()=>{
+    msg.className = 'msg ok';
+    msg.textContent = 'บันทึกสำเร็จ';
+    setTimeout(closeModal, 500);
+  }).catch(err=>{
+    msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  });
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+function renderHistoryTab(){
+  const wrap = document.getElementById('tabContent');
+  if(!wrap) return;
+  const ids = Object.keys(stockLogCache).sort((a,b)=> stockLogCache[b].date - stockLogCache[a].date);
+  if(ids.length === 0){
+    wrap.innerHTML = `<div class="empty-note">ยังไม่มีประวัติการเคลื่อนไหวสต็อก</div>`;
+    return;
+  }
+  const tagInfo = {
+    'sale': {label:'ขายออก', cls:'sale'},
+    'adjust-up': {label:'ปรับเพิ่ม', cls:'adjust-up'},
+    'adjust-down': {label:'ปรับลด', cls:'adjust-down'},
+    'receive': {label:'รับเข้า', cls:'receive'}
+  };
+  wrap.innerHTML = ids.map(id=>{
+    const log = stockLogCache[id];
+    const tag = tagInfo[log.type] || {label:log.type, cls:'sale'};
+    const sign = (log.type==='adjust-down' || log.type==='sale') ? '-' : '+';
+    return `<div class="log-item">
+      <div class="lhead">
+        <span><span class="log-tag ${tag.cls}">${tag.label}</span>${log.productName}</span>
+        <span>${sign}${log.qty}</span>
+      </div>
+      <div class="lmeta">${new Date(log.date).toLocaleString('th-TH')} · โดย ${log.staffName}${log.reason ? ' · ' + log.reason : ''}</div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

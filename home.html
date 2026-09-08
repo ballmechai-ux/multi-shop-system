@@ -155,7 +155,7 @@ function renderShopStep(){
     return `<div class="shop-card" data-shop="${shopId}">
       <div class="icon">🏪</div>
       <div class="info">
-        <div class="sname">${s.name}</div>
+        <div class="sname">${s.name} <span style="font-family:'Kanit'; font-size:10.5px; background:#0f172a; border:1px solid var(--border); color:#fbbf24; padding:1px 7px; border-radius:8px; margin-left:4px;">${s.code || 'ไม่มีรหัส'}</span></div>
         <div class="smeta">${s.type || ''} · ${branchCount} สาขา</div>
         <span class="workflow-tag ${wf}">${wfLabel}</span>
       </div>
@@ -230,6 +230,7 @@ function renderActionStep(){
     { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
     { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: isAdmin || perms.sell },
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
     { href:'addproduct.html', icon:'➕', label:'เพิ่มสินค้า', show: isAdmin || perms.addProduct },
     { href:'shops.html', icon:'🏪', label:'จัดการร้าน/สาขา', show: isAdmin },
     { href:'staffs.html', icon:'👨‍💼', label:'จัดการพนักงาน', show: isAdmin }
