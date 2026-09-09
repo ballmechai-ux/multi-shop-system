@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>รับสินค้าเข้า</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:14px; padding-bottom:60px;
+  }
+  .wrap{ max-width:640px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .topbar h1{ font-family:'Kanit'; font-size:18px; }
+  .topbar .who{ font-size:11px; color:var(--sub); text-align:right; }
+
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+  }
+  .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .shop-select{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .shop-select::-webkit-scrollbar{ display:none; }
+  .shop-chip{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12.5px; color:var(--sub); cursor:pointer; white-space:nowrap;
+  }
+  .shop-chip.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+  .current-shop-banner{
+    display:flex; align-items:center; gap:8px; background:#2563eb22; border:1px solid var(--accent);
+    border-radius:14px; padding:10px 14px; margin-bottom:12px; font-family:'Kanit'; font-size:14px; color:#93c5fd;
+  }
+  .current-shop-banner .pin{ font-size:16px; }
+
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:18px;
+    padding:18px; margin-bottom:14px;
+  }
+  .card h2{ font-family:'Kanit'; font-size:15px; margin-bottom:12px; }
+  label{ font-size:12.5px; color:var(--sub); display:block; margin-bottom:5px; }
+  input, select{
+    width:100%; padding:12px 13px; margin-bottom:10px; border-radius:12px;
+    border:1px solid var(--border); background:#0f172a; color:var(--text); font-size:14px; font-family:'Sarabun';
+  }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+  .search-row{ display:flex; gap:8px; margin-bottom:10px; }
+  .search-row input{ flex:1; margin-bottom:0; }
+  .scan-btn{
+    background:#0f172a; border:1px solid var(--border); border-radius:12px;
+    padding:0 16px; font-size:18px; cursor:pointer;
+  }
+  .search-results{ margin-bottom:10px; max-height:200px; overflow-y:auto; }
+  .search-item{
+    background:#0f172a; border:1px solid var(--border); border-radius:10px; padding:10px 12px;
+    margin-bottom:6px; cursor:pointer; display:flex; justify-content:space-between; font-size:13px;
+  }
+  .search-item:active{ border-color:var(--accent); }
+
+  .line-item{
+    background:#0f172a; border:1px solid var(--border); border-radius:12px; padding:12px;
+    margin-bottom:8px;
+  }
+  .line-item .lname{ font-family:'Kanit'; font-size:14px; margin-bottom:8px; }
+  .line-item .lrow{ display:flex; gap:8px; align-items:center; }
+  .line-item .lrow input{ margin-bottom:0; flex:1; }
+  .line-item .ldel{ color:var(--danger); font-size:16px; cursor:pointer; padding:0 4px; }
+  .line-total{ text-align:right; font-family:'Kanit'; font-size:13px; color:#93c5fd; margin-top:6px; }
+
+  .grand-total{
+    display:flex; justify-content:space-between; font-family:'Kanit'; font-size:19px;
+    padding-top:10px; margin-top:6px; border-top:1px solid var(--border);
+  }
+
+  .btn{
+    width:100%; padding:15px; border:none; border-radius:14px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:16px; font-weight:500; cursor:pointer; margin-top:10px;
+  }
+  .btn.outline{ background:transparent; border:1px solid var(--border); color:var(--sub); }
+  .msg{ font-size:13px; margin-top:8px; min-height:16px; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:20px 14px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+  .success-screen{ text-align:center; padding:30px 10px; }
+  .success-icon{ font-size:48px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังตรวจสอบสิทธิ์...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(session.role !== 'admin' && !(session.permissions && session.permissions.addProduct)){
+  app.innerHTML = `<div class="blocked"><h1>ไม่มีสิทธิ์รับสินค้าเข้า</h1><p>บัญชีนี้ไม่ได้รับสิทธิ์ "เพิ่มสินค้า" กรุณาติดต่อแอดมิน</p><br><a href="login.html" style="color:#3b82f6;">กลับหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let branchOptions = [];
+let currentBranch = null;
+let productsCache = {};
+let receiveItems = []; // {productId, name, unit, qty, costPrice}
+
+function boot(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    buildBranchOptions();
+    renderShell();
+  });
+}
+
+function buildBranchOptions(){
+  branchOptions = [];
+  Object.keys(shopsCache).forEach(shopId=>{
+    const shop = shopsCache[shopId];
+    const info = shop.info || {};
+    const branches = shop.branches || {};
+    const branchIds = Object.keys(branches);
+    let allowed = branchIds;
+    if(session.role !== 'admin'){
+      const access = session.access || {};
+      if(!access[shopId]) return;
+      allowed = branchIds.filter(bid => access[shopId][bid]);
+    }
+    allowed.forEach(bid=>{
+      branchOptions.push({ shopId, shopName: info.name, branchId: bid, branchName: branches[bid].name });
+    });
+  });
+  if(!currentBranch && branchOptions.length){
+    currentBranch = pickInitialBranch(branchOptions);
+  }
+}
+
+function pickInitialBranch(options){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+  if(saved && options.some(b=>b.shopId===saved.shopId && b.branchId===saved.branchId)){
+    return { shopId: saved.shopId, branchId: saved.branchId };
+  }
+  return { shopId: options[0].shopId, branchId: options[0].branchId };
+}
+
+function renderShell(){
+  const roleLabel = {admin:'ADMIN', owner:'OWNER', staff:'STAFF'}[session.role] || session.role;
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <h1>📥 รับสินค้าเข้า</h1>
+        <div class="who">${session.name}<br><span style="color:#93c5fd">${roleLabel}</span></div>
+      </div>
+      <div class="nav-bar" id="navBar"></div>
+      <div class="shop-select" id="shopSelect"></div>
+      <div class="current-shop-banner" id="currentShopBanner"></div>
+      <div id="mainContent"></div>
+    </div>
+  `;
+  renderNavBar();
+  renderShopSelect();
+  renderMainContent();
+}
+
+function renderNavBar(){
+  const wrap = document.getElementById('navBar');
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show:true },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+  ];
+  wrap.innerHTML = items.filter(i=>i.show).map(i=>
+    `<a class="nav-item ${i.href==='receive.html'?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
+}
+
+function renderShopSelect(){
+  const wrap = document.getElementById('shopSelect');
+  const banner = document.getElementById('currentShopBanner');
+  if(branchOptions.length === 0){
+    wrap.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขาที่เข้าถึงได้</div>`;
+    if(banner) banner.style.display = 'none';
+    return;
+  }
+  wrap.innerHTML = branchOptions.map(b=>{
+    const active = currentBranch && currentBranch.shopId===b.shopId && currentBranch.branchId===b.branchId;
+    return `<div class="shop-chip ${active?'active':''}" data-shop="${b.shopId}" data-branch="${b.branchId}">${b.shopName} · ${b.branchName}</div>`;
+  }).join('');
+  document.querySelectorAll('.shop-chip').forEach(el=>{
+    el.onclick = ()=>{
+      currentBranch = { shopId: el.dataset.shop, branchId: el.dataset.branch };
+      localStorage.setItem('currentShopBranch', JSON.stringify(currentBranch));
+      receiveItems = [];
+      renderShopSelect();
+      renderMainContent();
+    };
+  });
+  if(banner && currentBranch){
+    const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
+    if(cur){
+      banner.style.display = 'flex';
+      banner.innerHTML = `<span class="pin">📍</span> กำลังรับสินค้าเข้าร้าน: <b>${cur.shopName} · ${cur.branchName}</b><a href="home.html" style="margin-left:auto; color:inherit; text-decoration:underline; font-size:12px;">🔄 เปลี่ยนร้าน</a>`;
+    }
+  }
+}
+
+function renderMainContent(){
+  const content = document.getElementById('mainContent');
+  if(!currentBranch){
+    content.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขา — ไปเพิ่มร้านที่ shops.html ก่อน</div>`;
+    return;
+  }
+  const today = new Date().toISOString().slice(0,10);
+  content.innerHTML = `
+    <div class="card">
+      <h2>ข้อมูลเอกสาร</h2>
+      <div class="row2">
+        <div><label>เลขที่เอกสาร</label><input id="rcDocNo" placeholder="เว้นว่างเพื่อให้ระบบสร้างให้"></div>
+        <div><label>วันที่</label><input id="rcDate" type="date" value="${today}"></div>
+      </div>
+      <label>ผู้จำหน่าย / ซัพพลายเออร์</label>
+      <input id="rcSupplier" placeholder="ชื่อร้าน/บริษัทที่สั่งของมา">
+    </div>
+
+    <div class="card">
+      <h2>เพิ่มสินค้าที่รับเข้า</h2>
+      <div class="search-row">
+        <input type="text" id="rcSearch" placeholder="🔍 ค้นหาสินค้าที่มีอยู่แล้ว">
+        <div class="scan-btn" id="rcScanBtn">📷</div>
+      </div>
+      <div class="search-results" id="rcSearchResults"></div>
+      <div id="rcLineItems"></div>
+      <div class="grand-total"><span>ยอดรวม</span><span id="rcGrandTotal">฿0</span></div>
+    </div>
+
+    <button class="btn" id="rcSaveBtn">💾 บันทึกการรับสินค้าเข้า</button>
+    <button class="btn outline" onclick="location.href='stock.html'">ยกเลิก</button>
+    <div class="msg" id="rcMsg"></div>
+  `;
+
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/products`;
+  db.ref(basePath).on('value', snap=>{
+    productsCache = snap.val() || {};
+  });
+
+  document.getElementById('rcSearch').oninput = renderSearchResults;
+  document.getElementById('rcScanBtn').onclick = ()=>{
+    const code = prompt('พิมพ์บาร์โค้ดสินค้า (จำลองการสแกน):');
+    if(code){ document.getElementById('rcSearch').value = code; renderSearchResults(); }
+  };
+  document.getElementById('rcSaveBtn').onclick = saveReceive;
+  renderLineItems();
+}
+
+function renderSearchResults(){
+  const q = document.getElementById('rcSearch').value.trim().toLowerCase();
+  const wrap = document.getElementById('rcSearchResults');
+  if(!q){ wrap.innerHTML = ''; return; }
+  const ids = Object.keys(productsCache).filter(id=>{
+    const p = productsCache[id];
+    return (p.name||'').toLowerCase().includes(q) || (p.barcode||'').toLowerCase().includes(q);
+  }).slice(0,8);
+  if(ids.length === 0){
+    wrap.innerHTML = `<div class="empty-note">ไม่พบสินค้า — ตรวจว่าเพิ่มสินค้านี้ไว้แล้วหรือยังในหน้า "เพิ่มสินค้า"</div>`;
+    return;
+  }
+  wrap.innerHTML = ids.map(id=>{
+    const p = productsCache[id];
+    return `<div class="search-item" data-id="${id}"><span>${p.name}</span><span>คงเหลือ ${p.stock??0}</span></div>`;
+  }).join('');
+  document.querySelectorAll('.search-item').forEach(el=>{
+    el.onclick = ()=>{
+      addLineItem(el.dataset.id);
+      document.getElementById('rcSearch').value = '';
+      wrap.innerHTML = '';
+    };
+  });
+}
+
+function addLineItem(productId){
+  const p = productsCache[productId];
+  const existing = receiveItems.find(it=>it.productId === productId);
+  if(existing){ existing.qty += 1; }
+  else {
+    receiveItems.push({ productId, name:p.name, unit:p.unit||'', qty:1, costPrice:p.costPrice||0 });
+  }
+  renderLineItems();
+}
+
+function renderLineItems(){
+  const wrap = document.getElementById('rcLineItems');
+  if(!wrap) return;
+  if(receiveItems.length === 0){
+    wrap.innerHTML = `<div class="empty-note">ยังไม่ได้เพิ่มสินค้า — ค้นหาแล้วแตะเพื่อเพิ่มด้านบน</div>`;
+    updateGrandTotal();
+    return;
+  }
+  wrap.innerHTML = receiveItems.map((it,i)=>`
+    <div class="line-item">
+      <div class="lname">${it.name} <span style="color:var(--sub); font-weight:400; font-size:12px;">${it.unit}</span></div>
+      <div class="lrow">
+        <div>
+          <label style="margin-bottom:3px">จำนวนที่รับเข้า</label>
+          <input type="number" min="1" value="${it.qty}" data-i="${i}" data-f="qty">
+        </div>
+        <div>
+          <label style="margin-bottom:3px">ราคาทุน/หน่วย</label>
+          <input type="number" min="0" value="${it.costPrice}" data-i="${i}" data-f="costPrice">
+        </div>
+        <span class="ldel" data-i="${i}">✕</span>
+      </div>
+      <div class="line-total">รวม ฿${(it.qty * it.costPrice).toLocaleString()}</div>
+    </div>
+  `).join('');
+  document.querySelectorAll('.line-item input').forEach(inp=>{
+    inp.oninput = (e)=>{
+      const i = e.target.dataset.i, f = e.target.dataset.f;
+      receiveItems[i][f] = parseFloat(e.target.value) || 0;
+      renderLineItems();
+    };
+  });
+  document.querySelectorAll('.ldel').forEach(el=>{
+    el.onclick = ()=>{ receiveItems.splice(el.dataset.i,1); renderLineItems(); };
+  });
+  updateGrandTotal();
+}
+
+function updateGrandTotal(){
+  const total = receiveItems.reduce((s,it)=> s + it.qty*it.costPrice, 0);
+  const el = document.getElementById('rcGrandTotal');
+  if(el) el.textContent = '฿' + total.toLocaleString();
+}
+
+function saveReceive(){
+  const msg = document.getElementById('rcMsg');
+  msg.className = 'msg error';
+  if(receiveItems.length === 0){ msg.textContent = 'กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ'; return; }
+
+  const supplier = document.getElementById('rcSupplier').value.trim();
+  const date = document.getElementById('rcDate').value;
+  let docNo = document.getElementById('rcDocNo').value.trim();
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+
+  const finalizeSave = (finalDocNo)=>{
+    const total = receiveItems.reduce((s,it)=> s + it.qty*it.costPrice, 0);
+    const receiptData = {
+      docNo: finalDocNo, date, supplier, items: receiveItems, total,
+      staffName: session.name, createdAt: Date.now()
+    };
+    db.ref(`${basePath}/receipts`).push().set(receiptData).then(()=>{
+      const promises = receiveItems.map(it=>
+        db.ref(`${basePath}/products/${it.productId}/stock`).transaction(cur=> (cur||0) + it.qty)
+          .then(()=> db.ref(`${basePath}/products/${it.productId}/costPrice`).set(it.costPrice))
+          .then(()=> db.ref(`${basePath}/stockLog`).push().set({
+            type:'receive', productId: it.productId, productName: it.name, qty: it.qty,
+            staffName: session.name, reason: `รับเข้า (${finalDocNo})`, date: Date.now()
+          }))
+      );
+      return Promise.all(promises);
+    }).then(()=>{
+      showSuccess(receiptData);
+    }).catch(err=>{
+      msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+    });
+  };
+
+  if(docNo){
+    finalizeSave(docNo);
+  } else {
+    db.ref('receiptCounter').transaction(cur => (cur||0)+1).then(result=>{
+      const seq = result.snapshot.val();
+      finalizeSave('RC-' + String(seq).padStart(5,'0'));
+    });
+  }
+}
+
+function showSuccess(receipt){
+  const app2 = document.getElementById('mainContent');
+  app2.innerHTML = `
+    <div class="success-screen">
+      <div class="success-icon">✅</div>
+      <h1 style="font-family:'Kanit'">บันทึกการรับสินค้าเข้าสำเร็จ</h1>
+      <div class="card" style="text-align:left; margin-top:16px;">
+        <div style="display:flex; justify-content:space-between; font-size:13px; padding:4px 0;"><span>เลขที่เอกสาร</span><span>${receipt.docNo}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; padding:4px 0;"><span>ผู้จำหน่าย</span><span>${receipt.supplier || '-'}</span></div>
+        <div style="display:flex; justify-content:space-between; font-family:'Kanit'; font-size:17px; padding-top:8px; margin-top:6px; border-top:1px solid var(--border);"><span>ยอดรวม</span><span>฿${receipt.total.toLocaleString()}</span></div>
+      </div>
+      <button class="btn" onclick="location.reload()">📥 รับสินค้าเข้าอีกรายการ</button>
+      <button class="btn outline" onclick="location.href='stock.html'">ไปดูสต็อก</button>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>

@@ -313,7 +313,7 @@ function renderOverviewTab(){
     el.onclick = ()=>{ activeFilter = el.dataset.f; renderOverviewTab(); };
   });
   document.getElementById('goReceiveBtn').onclick = ()=>{
-    alert('หน้า "รับสินค้าเข้า" ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
+    location.href = 'receive.html';
   };
   renderStockList();
 }

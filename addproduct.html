@@ -210,6 +210,7 @@ function renderNavBar(activePage){
     { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
     { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show: true },
     { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
     { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
   ];

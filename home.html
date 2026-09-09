@@ -231,6 +231,7 @@ function renderActionStep(){
     { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: isAdmin || perms.sell },
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
     { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show: isAdmin || perms.addProduct },
     { href:'addproduct.html', icon:'➕', label:'เพิ่มสินค้า', show: isAdmin || perms.addProduct },
     { href:'shops.html', icon:'🏪', label:'จัดการร้าน/สาขา', show: isAdmin },
     { href:'staffs.html', icon:'👨‍💼', label:'จัดการพนักงาน', show: isAdmin }
