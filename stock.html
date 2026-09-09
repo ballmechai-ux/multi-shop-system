@@ -208,7 +208,7 @@ function renderShell(){
         <div class="who">${session.name}<br><span style="color:#93c5fd">${roleLabel}</span></div>
       </div>
       <div class="nav-bar" id="navBar"></div>
-      <div class="shop-select" id="shopSelect"></div>
+      <div class="shop-select" id="shopSelect" style="display:none"></div>
       <div class="current-shop-banner" id="currentShopBanner"></div>
       <div id="mainContent"></div>
     </div>
@@ -236,25 +236,11 @@ function renderNavBar(){
 }
 
 function renderShopSelect(){
-  const wrap = document.getElementById('shopSelect');
   const banner = document.getElementById('currentShopBanner');
   if(branchOptions.length === 0){
-    wrap.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขาที่เข้าถึงได้</div>`;
-    if(banner) banner.style.display = 'none';
+    if(banner){ banner.style.display = 'flex'; banner.innerHTML = `ยังไม่มีร้าน/สาขาที่เข้าถึงได้`; }
     return;
   }
-  wrap.innerHTML = branchOptions.map(b=>{
-    const active = currentBranch && currentBranch.shopId===b.shopId && currentBranch.branchId===b.branchId;
-    return `<div class="shop-chip ${active?'active':''}" data-shop="${b.shopId}" data-branch="${b.branchId}">${b.shopName} · ${b.branchName}</div>`;
-  }).join('');
-  document.querySelectorAll('.shop-chip').forEach(el=>{
-    el.onclick = ()=>{
-      currentBranch = { shopId: el.dataset.shop, branchId: el.dataset.branch };
-      localStorage.setItem('currentShopBranch', JSON.stringify(currentBranch));
-      renderShopSelect();
-      renderMainContent();
-    };
-  });
   if(banner && currentBranch){
     const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
     if(cur){
