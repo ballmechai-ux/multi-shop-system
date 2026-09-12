@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root{
     --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
@@ -99,6 +100,24 @@
   .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
   .success-screen{ text-align:center; padding:30px 10px; }
   .success-icon{ font-size:48px; margin-bottom:10px; }
+
+  .scan-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.75); display:none;
+    align-items:center; justify-content:center; z-index:80; padding:16px;
+  }
+  .scan-overlay.show{ display:flex; }
+  .scan-sheet{
+    background:#0b1222; border-radius:20px; padding:16px; width:100%; max-width:420px;
+    border:1px solid var(--border);
+  }
+  .scan-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .scan-head h3{ font-family:'Kanit'; font-size:15px; }
+  .scan-close{ color:var(--sub); font-size:20px; cursor:pointer; }
+  #scanReaderBox{ border-radius:12px; overflow:hidden; background:#000; min-height:220px; }
+  .scan-error{ color:var(--danger); font-size:13px; text-align:center; padding:12px 0; }
+  .scan-manual{ display:flex; gap:8px; margin-top:12px; }
+  .scan-manual input{ flex:1; margin-bottom:0; padding:11px 12px; border-radius:10px; border:1px solid var(--border); background:#0f172a; color:var(--text); font-size:14px; }
+  .scan-manual button{ background:var(--accent); border:none; border-radius:10px; color:#fff; padding:0 16px; font-family:'Kanit'; font-size:13px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -116,6 +135,81 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+// ---------- Shared camera barcode scanner ----------
+let html5QrCode = null;
+
+function ensureScanModal(){
+  let overlay = document.getElementById('scanModalOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'scanModalOverlay';
+    overlay.className = 'scan-overlay';
+    overlay.innerHTML = `
+      <div class="scan-sheet">
+        <div class="scan-head"><h3>📷 สแกนบาร์โค้ด</h3><span class="scan-close" id="scanCloseBtn">✕</span></div>
+        <div id="scanReaderBox"></div>
+        <div id="scanErrorBox"></div>
+        <div class="scan-manual">
+          <input id="scanManualInput" placeholder="หรือพิมพ์บาร์โค้ดเอง">
+          <button id="scanManualBtn">ตกลง</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  return overlay;
+}
+
+function openScanner(onResult){
+  const overlay = ensureScanModal();
+  overlay.classList.add('show');
+  document.getElementById('scanErrorBox').innerHTML = '';
+  document.getElementById('scanManualInput').value = '';
+
+  document.getElementById('scanCloseBtn').onclick = ()=> closeScanner();
+  document.getElementById('scanManualBtn').onclick = ()=>{
+    const v = document.getElementById('scanManualInput').value.trim();
+    if(v){ closeScanner(); onResult(v); }
+  };
+
+  html5QrCode = new Html5Qrcode("scanReaderBox");
+  Html5Qrcode.getCameras().then(cameras=>{
+    if(!cameras || cameras.length === 0){
+      showScanError('ไม่พบกล้องในอุปกรณ์นี้ — พิมพ์บาร์โค้ดเองด้านล่างแทนได้');
+      return;
+    }
+    const backCam = cameras.find(c=>/back|rear|environment/i.test(c.label));
+    const camId = backCam ? backCam.id : cameras[cameras.length-1].id;
+    html5QrCode.start(
+      camId,
+      { fps:10, qrbox:{ width:250, height:150 } },
+      (decodedText)=>{
+        closeScanner();
+        onResult(decodedText);
+      },
+      ()=>{ /* ignore per-frame decode failures */ }
+    ).catch(err=>{
+      showScanError('เปิดกล้องไม่สำเร็จ — ตรวจสอบว่าอนุญาตให้เว็บนี้ใช้กล้องแล้ว หรือพิมพ์บาร์โค้ดเองด้านล่าง');
+    });
+  }).catch(()=>{
+    showScanError('ไม่ได้รับอนุญาตให้ใช้กล้อง — พิมพ์บาร์โค้ดเองด้านล่างแทนได้');
+  });
+}
+
+function showScanError(msg){
+  const box = document.getElementById('scanErrorBox');
+  if(box) box.innerHTML = `<div class="scan-error">${msg}</div>`;
+}
+
+function closeScanner(){
+  const overlay = document.getElementById('scanModalOverlay');
+  if(overlay) overlay.classList.remove('show');
+  if(html5QrCode){
+    html5QrCode.stop().then(()=> html5QrCode.clear()).catch(()=>{});
+    html5QrCode = null;
+  }
+}
 const app = document.getElementById('app');
 
 const sessionRaw = localStorage.getItem('shopSession');
@@ -266,8 +360,10 @@ function renderMainContent(){
 
   document.getElementById('rcSearch').oninput = renderSearchResults;
   document.getElementById('rcScanBtn').onclick = ()=>{
-    const code = prompt('พิมพ์บาร์โค้ดสินค้า (จำลองการสแกน):');
-    if(code){ document.getElementById('rcSearch').value = code; renderSearchResults(); }
+    openScanner(code=>{
+      document.getElementById('rcSearch').value = code;
+      renderSearchResults();
+    });
   };
   document.getElementById('rcSaveBtn').onclick = saveReceive;
   renderLineItems();

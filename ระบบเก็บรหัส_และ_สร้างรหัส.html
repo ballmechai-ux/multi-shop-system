@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ตู้เก็บรหัสลับ</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(160deg,#0f1220,#1a1f38 60%,#241b3a);
+    color: #eee; min-height: 100vh; padding-bottom: 78px;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 16px; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; position: sticky; top: 0; z-index: 20;
+    background: rgba(15,18,32,0.9); backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255,215,120,0.15);
+  }
+  .topbar h1 { font-size: 18px; margin: 0; color: #f2c94c; display:flex; align-items:center; gap:8px; }
+  .iconbtn {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+    color: #eee; border-radius: 10px; padding: 8px 10px; font-size: 15px; cursor: pointer;
+  }
+  .iconbtn:active { transform: scale(0.95); }
+
+  .bottomnav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+    background: rgba(15,18,32,0.95); backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,215,120,0.15);
+    display: flex; padding: 6px 10px; padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+  .navbtn {
+    flex: 1; background: none; border: none; color: #888; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 8px 4px; font-size: 11px; border-radius: 10px;
+  }
+  .navbtn .navicon { font-size: 21px; }
+  .navbtn.active { color: #f2c94c; }
+
+  .center-screen {
+    min-height: 80vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 20px; text-align: center;
+  }
+  .lock-icon { font-size: 56px; margin-bottom: 8px; }
+  .center-screen h2 { color: #f2c94c; margin: 4px 0 6px; }
+  .center-screen p { color: #aaa; font-size: 14px; margin: 0 0 22px; line-height: 1.6; }
+
+  input[type="password"], input[type="text"], textarea {
+    width: 100%; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06); color: #fff; font-size: 16px; margin-bottom: 12px;
+    outline: none;
+  }
+  input:focus, textarea:focus { border-color: #f2c94c; }
+  textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+
+  .btn {
+    width: 100%; padding: 14px; border-radius: 12px; border: none; font-size: 16px;
+    font-weight: 700; cursor: pointer; margin-bottom: 10px;
+    background: linear-gradient(135deg,#f2c94c,#f2994a); color: #1a1220;
+  }
+  .btn-secondary { background: rgba(255,255,255,0.08); color: #eee; border: 1px solid rgba(255,255,255,0.15); }
+  .btn-danger { background: rgba(235,87,87,0.15); color: #eb5757; border: 1px solid rgba(235,87,87,0.4); }
+  .btn:active { transform: scale(0.98); }
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row .btn { flex: 1; }
+
+  .error-msg { color: #eb5757; font-size: 13px; margin: -4px 0 12px; min-height: 16px; }
+
+  .search-box { position: relative; margin: 12px 0; }
+  .search-box input { padding-left: 40px; margin-bottom: 0; }
+  .search-box::before {
+    content: "🔍"; position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    font-size: 15px; opacity: 0.6;
+  }
+
+  .entry {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px; padding: 14px; margin-bottom: 10px;
+  }
+  .entry-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .entry-title { font-weight: 600; font-size: 16px; color: #f2c94c; word-break: break-word; }
+  .entry-note { font-size: 12px; color: #999; margin-top: 2px; }
+  .entry-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .mini-btn {
+    background: rgba(255,255,255,0.08); border: none; color: #eee;
+    border-radius: 8px; padding: 6px 9px; font-size: 13px; cursor: pointer; flex-shrink: 0;
+  }
+  .mini-btn:active { transform: scale(0.92); }
+  .entry-code-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    background: rgba(0,0,0,0.25); border-radius: 10px; padding: 10px 12px;
+  }
+  .entry-code {
+    flex: 1; font-family: 'Courier New', monospace; font-size: 16px; letter-spacing: 1px;
+    word-break: break-all; color: #7ee787;
+  }
+  .entry-code.masked { color: #666; letter-spacing: 3px; }
+
+  .empty-state { text-align: center; color: #777; padding: 60px 20px; }
+  .empty-state div:first-child { font-size: 44px; margin-bottom: 10px; }
+
+  .fab {
+    position: fixed; bottom: 90px; right: 24px; width: 58px; height: 58px; border-radius: 50%;
+    background: linear-gradient(135deg,#f2c94c,#f2994a); color: #1a1220; font-size: 28px;
+    border: none; box-shadow: 0 6px 20px rgba(242,153,74,0.4); cursor: pointer; z-index: 15;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .fab:active { transform: scale(0.92); }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .modal {
+    background: #1c1f36; width: 100%; max-width: 480px; border-radius: 20px 20px 0 0;
+    padding: 22px 18px 26px; max-height: 88vh; overflow-y: auto;
+  }
+  .modal h3 { margin: 0 0 16px; color: #f2c94c; }
+  .toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: #2d2f45; color: #fff; padding: 10px 18px; border-radius: 20px;
+    font-size: 14px; z-index: 60; box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  }
+  .hidden { display: none !important; }
+  label.field-label { display:block; font-size:13px; color:#aaa; margin-bottom:6px; }
+
+  .gen-topbar { text-align: center; padding: 18px 0 6px; }
+  .gen-topbar h1 { font-size: 20px; margin: 0; color: #f2c94c; }
+  .gen-topbar p { color: #999; font-size: 13px; margin: 6px 0 0; }
+  .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 18px; margin-top: 18px; }
+  .output-box { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .output-text { flex: 1; font-family: 'Courier New', monospace; font-size: 19px; letter-spacing: 1px; color: #7ee787; word-break: break-all; min-height: 26px; }
+  .strength-bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.1); overflow: hidden; margin-bottom: 4px; }
+  .strength-fill { height: 100%; width: 0%; transition: width 0.3s, background 0.3s; }
+  .strength-label { font-size: 12px; text-align: right; color: #999; margin-bottom: 4px; }
+  .row { display: flex; align-items: center; justify-content: space-between; margin: 14px 0; }
+  .row-label { font-size: 15px; }
+  .len-value { color: #f2c94c; font-weight: 700; font-size: 18px; }
+  input[type="range"] {
+    width: 100%; height: 6px; border-radius: 4px; -webkit-appearance: none;
+    background: rgba(255,255,255,0.15); outline: none; margin-top: 6px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: #f2c94c; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 15px; }
+  .toggle-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .switch { position: relative; width: 48px; height: 26px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; inset: 0; background: rgba(255,255,255,0.15); border-radius: 26px; transition: 0.2s; }
+  .slider::before { content: ""; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: #ccc; border-radius: 50%; transition: 0.2s; }
+  .switch input:checked + .slider { background: #f2994a; }
+  .switch input:checked + .slider::before { transform: translateX(22px); background: #fff; }
+  .btn-flat { width: 100%; padding: 13px; border-radius: 12px; margin-top: 10px; font-size: 14px; background: rgba(255,255,255,0.08); color: #eee; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; }
+  .btn-flat:active { transform: scale(0.98); }
+  .history-item { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .history-text { flex: 1; font-family: 'Courier New', monospace; font-size: 14px; color: #ddd; word-break: break-all; }
+  .section-title { font-size: 14px; color: #999; margin: 22px 4px 8px; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="bottomnav">
+  <button class="navbtn" id="navVaultBtn" onclick="goPage('vault')">
+    <span class="navicon">🔐</span><span>ตู้เก็บรหัส</span>
+  </button>
+  <button class="navbtn" id="navGenBtn" onclick="goPage('generator')">
+    <span class="navicon">🎲</span><span>สร้างรหัสผ่าน</span>
+  </button>
+</div>
+
+<script>
+let currentPage = 'vault';
+function goPage(page){
+  currentPage = page;
+  document.getElementById('navVaultBtn').classList.toggle('active', page === 'vault');
+  document.getElementById('navGenBtn').classList.toggle('active', page === 'generator');
+  render();
+}
+function render(){
+  if (currentPage === 'vault') renderVaultRouter();
+  else renderGenerator();
+}
+function toast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 1700);
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+const STORAGE_KEY = 'secretVaultV1';
+let vaultKey = null;
+let entries = [];
+let searchTerm = '';
+let editingId = null;
+let pendingGeneratedCode = null;
+
+function bufToB64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function b64ToBuf(b64){ return Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+
+async function deriveKey(password, saltBytes){
+  const enc = new TextEncoder();
+  const km = await crypto.subtle.importKey('raw', enc.encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt: saltBytes, iterations: 150000, hash:'SHA-256'},
+    km, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']
+  );
+}
+async function encryptJSON(key, obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, enc.encode(JSON.stringify(obj)));
+  return { iv: bufToB64(iv), data: bufToB64(ct) };
+}
+async function decryptJSON(key, ivB64, dataB64){
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv: b64ToBuf(ivB64)}, key, b64ToBuf(dataB64));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+function getVaultRecord(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+function saveVaultRecordLocal(rec){ localStorage.setItem(STORAGE_KEY, JSON.stringify(rec)); }
+async function saveVaultRecord(rec){
+  saveVaultRecordLocal(rec);
+  if (fileLinked && fileHandle) await writeRecordToFile(rec);
+}
+async function persistEntries(){
+  const rec = getVaultRecord();
+  const enc = await encryptJSON(vaultKey, entries);
+  rec.iv = enc.iv; rec.data = enc.data;
+  await saveVaultRecord(rec);
+}
+
+// ---- ไฟล์ข้อมูลจริงบนเครื่อง (File System Access API) ----
+const FS_SUPPORTED = 'showSaveFilePicker' in window;
+let fileHandle = null;
+let fileLinked = false;
+let filePermissionGranted = false;
+
+function idbOpen(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('secretVaultFileDB', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('handles');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(key, val){
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('handles', 'readonly');
+    const req = tx.objectStore('handles').get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function verifyPermission(handle, forWrite){
+  const opts = forWrite ? { mode: 'readwrite' } : {};
+  if ((await handle.queryPermission(opts)) === 'granted') { filePermissionGranted = true; return true; }
+  if ((await handle.requestPermission(opts)) === 'granted') { filePermissionGranted = true; return true; }
+  filePermissionGranted = false;
+  return false;
+}
+
+async function writeRecordToFile(rec){
+  if (!fileHandle) return;
+  try {
+    const ok = await verifyPermission(fileHandle, true);
+    if (!ok) return;
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(rec));
+    await writable.close();
+  } catch (e) { console.warn('เขียนไฟล์ไม่สำเร็จ', e); }
+}
+
+async function linkNewFile(){
+  try {
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: 'secret_vault_data.json',
+      types: [{ description: 'Vault JSON', accept: { 'application/json': ['.json'] } }]
+    });
+    await idbSet('vaultHandle', fileHandle);
+    fileLinked = true;
+    const rec = getVaultRecord();
+    if (rec) await writeRecordToFile(rec);
+    toast('เชื่อมไฟล์เรียบร้อย ข้อมูลจะบันทึกลงไฟล์นี้ทุกครั้ง');
+    closeSettings(); openSettings();
+  } catch (e) { if (e.name !== 'AbortError') toast('เชื่อมไฟล์ไม่สำเร็จ'); }
+}
+
+async function openExistingFile(){
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      types: [{ description: 'Vault JSON', accept: { 'application/json': ['.json'] } }]
+    });
+    const file = await handle.getFile();
+    const text = await file.text();
+    const rec = JSON.parse(text);
+    if (!rec.salt || !rec.iv || !rec.data) throw new Error('invalid');
+    if (!confirm('เปิดไฟล์นี้จะแทนที่ข้อมูลปัจจุบันทั้งหมด ดำเนินการต่อหรือไม่?')) return;
+    await idbSet('vaultHandle', handle);
+    fileHandle = handle; fileLinked = true; filePermissionGranted = true;
+    saveVaultRecordLocal(rec);
+    vaultKey = null; entries = [];
+    toast('เชื่อมไฟล์แล้ว กรุณาปลดล็อคด้วยรหัสผ่านของไฟล์นั้น');
+    closeSettings();
+    renderVaultRouter();
+  } catch (e) { if (e.name !== 'AbortError') toast('เปิดไฟล์ไม่สำเร็จ'); }
+}
+
+async function unlinkFile(){
+  fileHandle = null; fileLinked = false; filePermissionGranted = false;
+  await idbSet('vaultHandle', null);
+  toast('ยกเลิกการเชื่อมไฟล์แล้ว (ข้อมูลยังอยู่ในเบราว์เซอร์นี้)');
+  closeSettings(); openSettings();
+}
+
+async function reconfirmPermission(){
+  try {
+    const ok = await verifyPermission(fileHandle, true);
+    toast(ok ? 'ยืนยันสิทธิ์แล้ว' : 'ไม่ได้รับสิทธิ์เข้าถึงไฟล์');
+  } catch (e) { toast('เกิดข้อผิดพลาด'); }
+  closeSettings(); openSettings();
+}
+
+async function tryRestoreFileHandle(){
+  if (!FS_SUPPORTED) return;
+  try {
+    const handle = await idbGet('vaultHandle');
+    if (handle) {
+      fileHandle = handle;
+      fileLinked = true;
+      filePermissionGranted = (await handle.queryPermission({ mode: 'readwrite' })) === 'granted';
+    }
+  } catch (e) { /* ไม่มีไฟล์ที่เชื่อมไว้ */ }
+}
+
+function renderVaultRouter(){
+  const rec = getVaultRecord();
+  if (!rec) renderSetup();
+  else if (!vaultKey) renderLock();
+  else renderMain();
+}
+
+function renderSetup(){
+  document.getElementById('app').innerHTML = `
+    <div class="center-screen">
+      <div class="lock-icon">🔐</div>
+      <h2>ตั้งค่าตู้เก็บรหัสลับ</h2>
+      <p>สร้างรหัสผ่านหลักสำหรับปลดล็อค<br>เก็บรหัสนี้ไว้ให้ดี ถ้าลืมจะกู้ข้อมูลคืนไม่ได้</p>
+      <input type="password" id="pw1" placeholder="ตั้งรหัสผ่านหลัก">
+      <input type="password" id="pw2" placeholder="ยืนยันรหัสผ่านอีกครั้ง">
+      <div class="error-msg" id="setupErr"></div>
+      <button class="btn" onclick="doSetup()">สร้างตู้เก็บรหัส</button>
+    </div>`;
+}
+async function doSetup(){
+  const pw1 = document.getElementById('pw1').value;
+  const pw2 = document.getElementById('pw2').value;
+  const errEl = document.getElementById('setupErr');
+  if (pw1.length < 4) { errEl.textContent = 'รหัสผ่านต้องยาวอย่างน้อย 4 ตัวอักษร'; return; }
+  if (pw1 !== pw2) { errEl.textContent = 'รหัสผ่านทั้งสองช่องไม่ตรงกัน'; return; }
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKey(pw1, salt);
+  const enc = await encryptJSON(key, []);
+  await saveVaultRecord({ salt: bufToB64(salt), iv: enc.iv, data: enc.data });
+  vaultKey = key; entries = [];
+  toast('สร้างตู้เก็บรหัสเรียบร้อย');
+  renderVaultRouter();
+}
+
+function renderLock(){
+  document.getElementById('app').innerHTML = `
+    <div class="center-screen">
+      <div class="lock-icon">🔒</div>
+      <h2>ตู้เก็บรหัสลับถูกล็อคอยู่</h2>
+      <p>ใส่รหัสผ่านหลักเพื่อปลดล็อคดูรายการ</p>
+      <input type="password" id="pwUnlock" placeholder="รหัสผ่านหลัก" autofocus>
+      <div class="error-msg" id="lockErr"></div>
+      <button class="btn" onclick="doUnlock()">ปลดล็อค</button>
+    </div>`;
+  const inp = document.getElementById('pwUnlock');
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock(); });
+}
+async function doUnlock(){
+  const pw = document.getElementById('pwUnlock').value;
+  const errEl = document.getElementById('lockErr');
+  const rec = getVaultRecord();
+  try {
+    const salt = b64ToBuf(rec.salt);
+    const key = await deriveKey(pw, salt);
+    const data = await decryptJSON(key, rec.iv, rec.data);
+    vaultKey = key; entries = data;
+    renderVaultRouter();
+    if (pendingGeneratedCode) {
+      const code = pendingGeneratedCode; pendingGeneratedCode = null;
+      openAdd(code);
+    }
+  } catch (e) {
+    errEl.textContent = 'รหัสผ่านไม่ถูกต้อง';
+  }
+}
+function lockVault(){ vaultKey = null; entries = []; renderVaultRouter(); }
+
+function renderMain(){
+  const filtered = entries.filter(e =>
+    e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (e.note||'').toLowerCase().includes(searchTerm.toLowerCase())
+  ).sort((a,b) => a.title.localeCompare(b.title, 'th'));
+
+  let listHtml = '';
+  if (entries.length === 0) {
+    listHtml = `<div class="empty-state"><div>🗝️</div>ยังไม่มีรายการ<br>กดปุ่ม + เพื่อเพิ่มรหัสแรก</div>`;
+  } else if (filtered.length === 0) {
+    listHtml = `<div class="empty-state"><div>🔎</div>ไม่พบรายการที่ค้นหา</div>`;
+  } else {
+    listHtml = filtered.map(e => `
+      <div class="entry">
+        <div class="entry-top">
+          <div>
+            <div class="entry-title">${escapeHtml(e.title)}</div>
+            ${e.note ? `<div class="entry-note">${escapeHtml(e.note)}</div>` : ''}
+          </div>
+          <div class="entry-actions">
+            <button class="mini-btn" onclick="openEdit('${e.id}')">✏️</button>
+            <button class="mini-btn" onclick="deleteEntry('${e.id}')">🗑️</button>
+          </div>
+        </div>
+        <div class="entry-code-row">
+          <div class="entry-code masked" id="code-${e.id}" data-value="${escapeHtml(e.code)}">••••••••</div>
+          <button class="mini-btn" onclick="toggleCode('${e.id}')" id="eye-${e.id}">👁️</button>
+          <button class="mini-btn" onclick="copyCode('${e.id}')">📋</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('app').innerHTML = `
+    <div class="topbar">
+      <h1>🔐 ตู้เก็บรหัสลับ</h1>
+      <div style="display:flex; gap:8px;">
+        <button class="iconbtn" onclick="openSettings()">⚙️</button>
+        <button class="iconbtn" onclick="lockVault()">🔒 ล็อค</button>
+      </div>
+    </div>
+    <div class="wrap">
+      <div class="search-box">
+        <input type="text" placeholder="ค้นหารายการ..." value="${escapeHtml(searchTerm)}" oninput="onSearch(this.value)">
+      </div>
+      ${listHtml}
+    </div>
+    <button class="fab" onclick="openAdd()">＋</button>
+  `;
+}
+function onSearch(v){ searchTerm = v; renderMain(); }
+
+function toggleCode(id){
+  const el = document.getElementById('code-'+id);
+  const eye = document.getElementById('eye-'+id);
+  const isMasked = el.classList.contains('masked');
+  if (isMasked) { el.textContent = el.dataset.value; el.classList.remove('masked'); eye.textContent = '🙈'; }
+  else { el.textContent = '••••••••'; el.classList.add('masked'); eye.textContent = '👁️'; }
+}
+function copyCode(id){
+  const el = document.getElementById('code-'+id);
+  navigator.clipboard.writeText(el.dataset.value).then(()=>toast('คัดลอกแล้ว')).catch(()=>toast('คัดลอกไม่สำเร็จ'));
+}
+
+function openAdd(prefillCode){
+  editingId = null;
+  showEntryModal('เพิ่มรหัสใหม่', '', prefillCode || '', '');
+}
+function openEdit(id){
+  const e = entries.find(x => x.id === id);
+  editingId = id;
+  showEntryModal('แก้ไขรายการ', e.title, e.code, e.note||'');
+}
+function showEntryModal(heading, title, code, note){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'entryModalOverlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>${heading}</h3>
+      <label class="field-label">ชื่อหัวข้อ</label>
+      <input type="text" id="fTitle" placeholder="เช่น รหัส WiFi บ้าน" value="${escapeHtml(title)}">
+      <label class="field-label">รหัส / ข้อความลับ</label>
+      <input type="text" id="fCode" placeholder="รหัสหรือข้อความที่ต้องการเก็บ" value="${escapeHtml(code)}">
+      <label class="field-label">โน้ตเพิ่มเติม (ไม่บังคับ)</label>
+      <textarea id="fNote" placeholder="รายละเอียดเพิ่มเติม...">${escapeHtml(note)}</textarea>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="closeModal()">ยกเลิก</button>
+        <button class="btn" onclick="saveEntry()">บันทึก</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+function closeModal(){ const o = document.getElementById('entryModalOverlay'); if (o) o.remove(); }
+async function saveEntry(){
+  const title = document.getElementById('fTitle').value.trim();
+  const code = document.getElementById('fCode').value.trim();
+  const note = document.getElementById('fNote').value.trim();
+  if (!title || !code) { toast('กรุณาใส่ชื่อหัวข้อและรหัส'); return; }
+  if (editingId) {
+    const e = entries.find(x => x.id === editingId);
+    e.title = title; e.code = code; e.note = note;
+  } else {
+    entries.push({ id: 'e' + Date.now() + Math.random().toString(36).slice(2,7), title, code, note, createdAt: Date.now() });
+  }
+  await persistEntries();
+  closeModal();
+  toast('บันทึกแล้ว');
+  renderMain();
+}
+async function deleteEntry(id){
+  if (!confirm('ลบรายการนี้ใช่หรือไม่?')) return;
+  entries = entries.filter(e => e.id !== id);
+  await persistEntries();
+  renderMain();
+  toast('ลบรายการแล้ว');
+}
+
+function openSettings(){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'settingsOverlay';
+  let fileStatusHtml;
+  if (!FS_SUPPORTED) {
+    fileStatusHtml = `<p style="color:#999;font-size:13px;margin:0 0 14px;line-height:1.5;">เบราว์เซอร์นี้ไม่รองรับการบันทึกลงไฟล์บนเครื่องโดยตรง (ใช้ได้กับ Chrome/Edge บนคอมพิวเตอร์) กรุณาใช้ "ส่งออก/นำเข้าไฟล์สำรอง" แทนเวลาย้ายเครื่อง</p>`;
+  } else if (fileLinked && filePermissionGranted) {
+    fileStatusHtml = `
+      <p style="color:#7ee787;font-size:13px;margin:0 0 10px;">🔗 เชื่อมไฟล์แล้ว — ข้อมูลจะถูกเขียนลงไฟล์นั้นทุกครั้งที่บันทึก</p>
+      <button class="btn btn-secondary" onclick="unlinkFile()">🔓 ยกเลิกการเชื่อมไฟล์</button>`;
+  } else if (fileLinked && !filePermissionGranted) {
+    fileStatusHtml = `
+      <p style="color:#f2994a;font-size:13px;margin:0 0 10px;">🔗 เชื่อมไฟล์ไว้ แต่ต้องยืนยันสิทธิ์เข้าถึงไฟล์อีกครั้ง</p>
+      <button class="btn btn-secondary" onclick="reconfirmPermission()">✅ ยืนยันสิทธิ์เข้าถึงไฟล์</button>
+      <button class="btn btn-secondary" onclick="unlinkFile()">🔓 ยกเลิกการเชื่อมไฟล์</button>`;
+  } else {
+    fileStatusHtml = `
+      <p style="color:#999;font-size:13px;margin:0 0 10px;line-height:1.5;">ยังไม่ได้เชื่อมไฟล์ — ตอนนี้ข้อมูลเก็บอยู่ในเบราว์เซอร์นี้เท่านั้น ถ้าย้ายไฟล์ HTML ไปเปิดที่อื่นข้อมูลจะไม่ตามไป</p>
+      <button class="btn btn-secondary" onclick="linkNewFile()">🔗 สร้างไฟล์ข้อมูลใหม่ (แนะนำ)</button>
+      <button class="btn btn-secondary" onclick="openExistingFile()">📂 เชื่อมไฟล์ข้อมูลเดิมที่เคยสร้างไว้</button>`;
+  }
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>⚙️ ตั้งค่า</h3>
+      ${fileStatusHtml}
+      <button class="btn btn-secondary" onclick="showChangePassword()">🔑 เปลี่ยนรหัสผ่านหลัก</button>
+      <button class="btn btn-secondary" onclick="exportBackup()">📤 ส่งออกไฟล์สำรอง (เข้ารหัสแล้ว)</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📥 นำเข้าไฟล์สำรอง</button>
+      <input type="file" id="importFile" accept=".json" class="hidden" onchange="importBackup(this.files[0])">
+      <button class="btn btn-danger" onclick="wipeAll()">🗑️ ลบข้อมูลทั้งหมด</button>
+      <button class="btn btn-secondary" onclick="closeSettings()">ปิด</button>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+function closeSettings(){ const o = document.getElementById('settingsOverlay'); if (o) o.remove(); }
+
+function showChangePassword(){
+  closeSettings();
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'cpOverlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>🔑 เปลี่ยนรหัสผ่านหลัก</h3>
+      <label class="field-label">รหัสผ่านเดิม</label>
+      <input type="password" id="cpOld" placeholder="รหัสผ่านปัจจุบัน">
+      <label class="field-label">รหัสผ่านใหม่</label>
+      <input type="password" id="cpNew" placeholder="รหัสผ่านใหม่">
+      <label class="field-label">ยืนยันรหัสผ่านใหม่</label>
+      <input type="password" id="cpNew2" placeholder="ยืนยันรหัสผ่านใหม่">
+      <div class="error-msg" id="cpErr"></div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="document.getElementById('cpOverlay').remove()">ยกเลิก</button>
+        <button class="btn" onclick="changePassword()">บันทึก</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+async function changePassword(){
+  const oldPw = document.getElementById('cpOld').value;
+  const newPw = document.getElementById('cpNew').value;
+  const newPw2 = document.getElementById('cpNew2').value;
+  const errEl = document.getElementById('cpErr');
+  const rec = getVaultRecord();
+  try {
+    const oldKey = await deriveKey(oldPw, b64ToBuf(rec.salt));
+    await decryptJSON(oldKey, rec.iv, rec.data);
+  } catch(e) { errEl.textContent = 'รหัสผ่านเดิมไม่ถูกต้อง'; return; }
+  if (newPw.length < 4) { errEl.textContent = 'รหัสใหม่ต้องยาวอย่างน้อย 4 ตัวอักษร'; return; }
+  if (newPw !== newPw2) { errEl.textContent = 'รหัสใหม่ไม่ตรงกัน'; return; }
+  const newSalt = crypto.getRandomValues(new Uint8Array(16));
+  const newKey = await deriveKey(newPw, newSalt);
+  const enc = await encryptJSON(newKey, entries);
+  await saveVaultRecord({ salt: bufToB64(newSalt), iv: enc.iv, data: enc.data });
+  vaultKey = newKey;
+  document.getElementById('cpOverlay').remove();
+  toast('เปลี่ยนรหัสผ่านเรียบร้อย');
+}
+
+function exportBackup(){
+  const rec = getVaultRecord();
+  if (!rec) return;
+  const blob = new Blob([JSON.stringify(rec)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'secret_vault_backup.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  closeSettings();
+  toast('ดาวน์โหลดไฟล์สำรองแล้ว (ยังเข้ารหัสอยู่ ปลอดภัย)');
+}
+function importBackup(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const rec = JSON.parse(reader.result);
+      if (!rec.salt || !rec.iv || !rec.data) throw new Error('invalid');
+      if (!confirm('การนำเข้าจะแทนที่ข้อมูลปัจจุบันทั้งหมด ดำเนินการต่อหรือไม่?')) return;
+      await saveVaultRecord(rec);
+      vaultKey = null; entries = [];
+      closeSettings();
+      toast('นำเข้าไฟล์สำรองแล้ว กรุณาปลดล็อคด้วยรหัสผ่านของไฟล์นั้น');
+      renderVaultRouter();
+    } catch(e) { toast('ไฟล์ไม่ถูกต้อง'); }
+  };
+  reader.readAsText(file);
+}
+function wipeAll(){
+  if (!confirm('ลบข้อมูลทั้งหมดถาวร ไม่สามารถกู้คืนได้ ยืนยันหรือไม่?')) return;
+  if (!confirm('ยืนยันอีกครั้ง: ลบตู้เก็บรหัสทั้งหมดใช่หรือไม่?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  vaultKey = null; entries = [];
+  closeSettings();
+  renderVaultRouter();
+  toast('ลบข้อมูลทั้งหมดแล้ว');
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && vaultKey) { lockVault(); }
+});
+
+let genHistory = [];
+let lastGenerated = '';
+
+function renderGenerator(){
+  document.getElementById('app').innerHTML = `
+    <div class="wrap">
+      <div class="gen-topbar">
+        <h1>🎲 สร้างรหัสผ่าน</h1>
+        <p>สุ่มรหัสผ่านที่ปลอดภัย ปรับแต่งได้ตามต้องการ</p>
+      </div>
+
+      <div class="card">
+        <div class="output-box">
+          <div class="output-text" id="output">••••••••••••</div>
+          <button class="mini-btn" onclick="genGenerate()">🎲</button>
+          <button class="mini-btn" onclick="genCopy()">📋</button>
+        </div>
+        <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+        <div class="strength-label" id="strengthLabel">&nbsp;</div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="row-label">ความยาวรหัสผ่าน</div>
+          <div class="len-value" id="lenValue">16</div>
+        </div>
+        <input type="range" id="lenSlider" min="4" max="64" value="16" oninput="genOnLenChange(this.value)">
+
+        <div class="toggle-row">
+          <div class="toggle-label">ตัวพิมพ์ใหญ่ (A-Z)</div>
+          <label class="switch"><input type="checkbox" id="optUpper" checked onchange="genGenerate()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-label">ตัวพิมพ์เล็ก (a-z)</div>
+          <label class="switch"><input type="checkbox" id="optLower" checked onchange="genGenerate()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-label">ตัวเลข (0-9)</div>
+          <label class="switch"><input type="checkbox" id="optNumbers" checked onchange="genGenerate()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-label">สัญลักษณ์ (!@#$%)</div>
+          <label class="switch"><input type="checkbox" id="optSymbols" checked onchange="genGenerate()"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">ตัดตัวอักษรที่สับสน</div>
+            <div class="toggle-sub">เช่น 0/O, 1/l/I</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="optExclude" onchange="genGenerate()"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <button class="btn" onclick="genGenerate()">🎲 สุ่มรหัสผ่านใหม่</button>
+      <button class="btn-flat" onclick="genSaveToVault()">🔐 บันทึกรหัสนี้ลงตู้เก็บรหัสลับ</button>
+      <button class="btn-flat" onclick="genBatch()">สร้างพร้อมกัน 5 ชุด</button>
+
+      <div id="historySection"></div>
+    </div>
+  `;
+  genGenerate();
+  genRenderHistory();
+}
+
+function genOnLenChange(v){
+  document.getElementById('lenValue').textContent = v;
+  genGenerate();
+}
+function genBuildCharset(){
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '0123456789';
+  const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  const confusing = /[0O1lI]/g;
+  let charset = '';
+  if (document.getElementById('optUpper').checked) charset += upper;
+  if (document.getElementById('optLower').checked) charset += lower;
+  if (document.getElementById('optNumbers').checked) charset += numbers;
+  if (document.getElementById('optSymbols').checked) charset += symbols;
+  if (document.getElementById('optExclude').checked) charset = charset.replace(confusing, '');
+  return charset;
+}
+function secureRandomInt(max){
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return arr[0] % max;
+}
+function genMakePassword(length, charset){
+  if (!charset) return '';
+  let pw = '';
+  for (let i = 0; i < length; i++) pw += charset[secureRandomInt(charset.length)];
+  return pw;
+}
+function genCalcStrength(pw, charsetSize){
+  if (!pw) return 0;
+  return pw.length * Math.log2(charsetSize || 2);
+}
+function genUpdateStrengthBar(entropy){
+  const fill = document.getElementById('strengthFill');
+  const label = document.getElementById('strengthLabel');
+  let pct, color, text;
+  if (entropy < 40) { pct = 25; color = '#eb5757'; text = 'อ่อน'; }
+  else if (entropy < 60) { pct = 50; color = '#f2994a'; text = 'ปานกลาง'; }
+  else if (entropy < 80) { pct = 75; color = '#f2c94c'; text = 'แข็งแรง'; }
+  else { pct = 100; color = '#7ee787'; text = 'แข็งแรงมาก'; }
+  fill.style.width = pct + '%';
+  fill.style.background = color;
+  label.textContent = text + ' · ' + Math.round(entropy) + ' bits';
+}
+function genGenerate(){
+  const length = parseInt(document.getElementById('lenSlider').value);
+  const charset = genBuildCharset();
+  const outputEl = document.getElementById('output');
+  if (!charset) {
+    outputEl.textContent = 'กรุณาเลือกอย่างน้อย 1 ประเภทตัวอักษร';
+    document.getElementById('strengthFill').style.width = '0%';
+    document.getElementById('strengthLabel').textContent = '\u00a0';
+    lastGenerated = '';
+    return;
+  }
+  const pw = genMakePassword(length, charset);
+  lastGenerated = pw;
+  outputEl.textContent = pw;
+  genUpdateStrengthBar(genCalcStrength(pw, charset.length));
+}
+function genBatch(){
+  const length = parseInt(document.getElementById('lenSlider').value);
+  const charset = genBuildCharset();
+  if (!charset) { toast('กรุณาเลือกอย่างน้อย 1 ประเภทตัวอักษร'); return; }
+  for (let i = 0; i < 5; i++) genHistory.unshift(genMakePassword(length, charset));
+  genHistory = genHistory.slice(0, 15);
+  genRenderHistory();
+  toast('สร้างแล้ว 5 ชุด');
+}
+function genRenderHistory(){
+  const section = document.getElementById('historySection');
+  if (!section) return;
+  if (genHistory.length === 0) { section.innerHTML = ''; return; }
+  section.innerHTML = `
+    <div class="section-title">รายการที่สร้างล่าสุด</div>
+    ${genHistory.map(pw => `
+      <div class="history-item">
+        <div class="history-text">${pw}</div>
+        <button class="mini-btn" onclick="genCopyText('${pw.replace(/'/g,"\\'")}')">📋</button>
+        <button class="mini-btn" onclick="genSaveSpecificToVault('${pw.replace(/'/g,"\\'")}')">🔐</button>
+      </div>
+    `).join('')}
+  `;
+}
+function genCopy(){ genCopyText(document.getElementById('output').textContent); }
+function genCopyText(text){
+  navigator.clipboard.writeText(text).then(()=>toast('คัดลอกแล้ว')).catch(()=>toast('คัดลอกไม่สำเร็จ'));
+}
+
+function genSaveToVault(){ genSaveSpecificToVault(lastGenerated); }
+function genSaveSpecificToVault(pw){
+  if (!pw) { toast('ยังไม่มีรหัสให้บันทึก'); return; }
+  const rec = getVaultRecord();
+  if (!rec || !vaultKey) {
+    pendingGeneratedCode = pw;
+    toast('กรุณาปลดล็อคตู้เก็บรหัสก่อน');
+    goPage('vault');
+    return;
+  }
+  goPage('vault');
+  openAdd(pw);
+}
+
+(async function init(){
+  await tryRestoreFileHandle();
+  goPage('vault');
+})();
+</script>
+</body>
+</html>
