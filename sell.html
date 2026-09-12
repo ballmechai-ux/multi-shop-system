@@ -90,11 +90,9 @@
   .pstock.low{ color:#fbbf24; }
   .pstock.out{ color:var(--danger); }
 
-  .product-grid.no-images{ grid-template-columns:1fr; }
-  .product-grid.no-images .product-card{ padding:12px 14px; }
-  .product-grid.no-images .pname{ display:inline; margin-right:8px; }
-  .product-grid.no-images .pprice{ display:inline; float:right; margin-top:0; }
-  .product-grid.no-images .pmeta{ clear:both; }
+  .product-card .pimg-blank{
+    width:100%; height:64px; border-radius:10px; margin-bottom:8px; background:transparent;
+  }
 
   .empty-note{ text-align:center; color:var(--sub); font-size:12.5px; padding:20px 10px; }
 
@@ -310,6 +308,7 @@ let branchOptions = [];
 let currentBranch = null;
 let activeCategory = 'ทั้งหมด';
 let showProductImages = localStorage.getItem('sellShowImages') !== '0'; // default: show
+let hasInteracted = false; // keep the grid blank until the user searches/scans/picks a category
 
 function updateImgToggleBtn(){
   const btn = document.getElementById('imgToggleBtn');
@@ -448,20 +447,22 @@ function renderMainContent(){
       <div id="cartSlot"></div>
     </div>
   `;
-  document.getElementById('searchBox').oninput = renderProductGrid;
+  document.getElementById('searchBox').oninput = ()=>{
+    hasInteracted = true;
+    renderProductGrid();
+  };
   document.getElementById('scanBtn').onclick = ()=>{
     openScanner(code=>{
+      hasInteracted = true;
       document.getElementById('searchBox').value = code;
       renderProductGrid();
     });
   };
   updateImgToggleBtn();
-  document.getElementById('productGrid').classList.toggle('no-images', !showProductImages);
   document.getElementById('imgToggleBtn').onclick = ()=>{
     showProductImages = !showProductImages;
     localStorage.setItem('sellShowImages', showProductImages ? '1' : '0');
     updateImgToggleBtn();
-    document.getElementById('productGrid').classList.toggle('no-images', !showProductImages);
     renderProductGrid();
   };
 
@@ -486,6 +487,7 @@ function renderCategorySidebar(){
   document.querySelectorAll('.cat-chip').forEach(el=>{
     el.onclick = ()=>{
       activeCategory = el.dataset.cat;
+      hasInteracted = true;
       renderCategorySidebar();
       renderProductGrid();
     };
@@ -507,6 +509,10 @@ function renderProductGrid(){
     grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1">ร้าน/สาขานี้ยังไม่มีสินค้า — ไปที่หน้า "เพิ่มสินค้า" (addproduct.html) เพื่อเพิ่มสินค้าก่อน</div>`;
     return;
   }
+  if(!hasInteracted){
+    grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1">🔍 ค้นหา, สแกน, หรือเลือกหมวดหมู่ทางซ้าย เพื่อแสดงรายการสินค้า</div>`;
+    return;
+  }
   if(ids.length === 0){
     grid.innerHTML = `<div class="empty-note" style="grid-column:1/-1">ไม่พบสินค้าที่ค้นหา</div>`;
     return;
@@ -519,7 +525,7 @@ function renderProductGrid(){
     let stockClass = '', stockLabel = `คงเหลือ ${stock}`;
     if(stock <= 0){ stockClass='out'; stockLabel='สินค้าหมด'; }
     else if(stock <= reorder){ stockClass='low'; stockLabel=`ใกล้หมด (${stock})`; }
-    const imgHtml = !showProductImages ? '' : (p.image
+    const imgHtml = !showProductImages ? '<div class="pimg-blank"></div>' : (p.image
       ? `<img class="pimg" src="${p.image}" onerror="this.outerHTML='<div class=&quot;pimg-fallback&quot;>🥤</div>'">`
       : `<div class="pimg-fallback">🥤</div>`);
     return `<div class="product-card" data-id="${id}">
