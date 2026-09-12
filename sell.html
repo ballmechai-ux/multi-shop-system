@@ -90,6 +90,12 @@
   .pstock.low{ color:#fbbf24; }
   .pstock.out{ color:var(--danger); }
 
+  .product-grid.no-images{ grid-template-columns:1fr; }
+  .product-grid.no-images .product-card{ padding:12px 14px; }
+  .product-grid.no-images .pname{ display:inline; margin-right:8px; }
+  .product-grid.no-images .pprice{ display:inline; float:right; margin-top:0; }
+  .product-grid.no-images .pmeta{ clear:both; }
+
   .empty-note{ text-align:center; color:var(--sub); font-size:12.5px; padding:20px 10px; }
 
   @media (min-width:900px){
@@ -303,6 +309,15 @@ let shopsCache = {};
 let branchOptions = [];
 let currentBranch = null;
 let activeCategory = 'ทั้งหมด';
+let showProductImages = localStorage.getItem('sellShowImages') !== '0'; // default: show
+
+function updateImgToggleBtn(){
+  const btn = document.getElementById('imgToggleBtn');
+  if(!btn) return;
+  btn.style.borderColor = showProductImages ? 'var(--accent)' : 'var(--border)';
+  btn.style.color = showProductImages ? '#93c5fd' : 'var(--sub)';
+  btn.style.background = showProductImages ? '#2563eb22' : 'var(--card)';
+}
 let productsCache = {};
 let cart = {}; // cartKey -> {productId, name, price, qty, discount, unit}
 
@@ -426,6 +441,7 @@ function renderMainContent(){
         <div class="search-row">
           <input type="text" id="searchBox" placeholder="🔍 ค้นหาชื่อสินค้า หรือรหัส/บาร์โค้ด">
           <div class="scan-btn" id="scanBtn">📷</div>
+          <div class="scan-btn" id="imgToggleBtn" title="แสดง/ซ่อนรูปภาพสินค้า">🖼️</div>
         </div>
         <div id="productGrid" class="product-grid"></div>
       </div>
@@ -438,6 +454,15 @@ function renderMainContent(){
       document.getElementById('searchBox').value = code;
       renderProductGrid();
     });
+  };
+  updateImgToggleBtn();
+  document.getElementById('productGrid').classList.toggle('no-images', !showProductImages);
+  document.getElementById('imgToggleBtn').onclick = ()=>{
+    showProductImages = !showProductImages;
+    localStorage.setItem('sellShowImages', showProductImages ? '1' : '0');
+    updateImgToggleBtn();
+    document.getElementById('productGrid').classList.toggle('no-images', !showProductImages);
+    renderProductGrid();
   };
 
   const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/products`;
@@ -494,9 +519,9 @@ function renderProductGrid(){
     let stockClass = '', stockLabel = `คงเหลือ ${stock}`;
     if(stock <= 0){ stockClass='out'; stockLabel='สินค้าหมด'; }
     else if(stock <= reorder){ stockClass='low'; stockLabel=`ใกล้หมด (${stock})`; }
-    const imgHtml = p.image
+    const imgHtml = !showProductImages ? '' : (p.image
       ? `<img class="pimg" src="${p.image}" onerror="this.outerHTML='<div class=&quot;pimg-fallback&quot;>🥤</div>'">`
-      : `<div class="pimg-fallback">🥤</div>`;
+      : `<div class="pimg-fallback">🥤</div>`);
     return `<div class="product-card" data-id="${id}">
       ${imgHtml}
       <div class="pname">${p.name||'(ไม่มีชื่อ)'}</div>
