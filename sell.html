@@ -94,6 +94,23 @@
     width:100%; height:64px; border-radius:10px; margin-bottom:8px; background:transparent;
   }
 
+  /* ---------- Horizontal row view ---------- */
+  .product-grid.row-view{ grid-template-columns:1fr; gap:8px; }
+  .product-grid.row-view .product-card{
+    display:flex; align-items:center; gap:12px; padding:10px 12px;
+  }
+  .product-grid.row-view .pimg,
+  .product-grid.row-view .pimg-fallback,
+  .product-grid.row-view .pimg-blank{
+    width:56px; height:56px; margin-bottom:0; flex:0 0 auto; font-size:22px;
+  }
+  .product-grid.row-view .pinfo{ flex:1; min-width:0; }
+  .product-grid.row-view .pname{
+    margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .product-grid.row-view .pprice{ margin-top:0; flex:0 0 auto; text-align:right; }
+  .product-grid.row-view .pstock{ margin-top:2px; }
+
   .empty-note{ text-align:center; color:var(--sub); font-size:12.5px; padding:20px 10px; }
 
   @media (min-width:900px){
@@ -308,6 +325,7 @@ let branchOptions = [];
 let currentBranch = null;
 let activeCategory = 'ทั้งหมด';
 let showProductImages = localStorage.getItem('sellShowImages') !== '0'; // default: show
+let viewMode = localStorage.getItem('sellViewMode') === 'row' ? 'row' : 'grid';
 let hasInteracted = false; // keep the grid blank until the user searches/scans/picks a category
 
 function updateImgToggleBtn(){
@@ -316,6 +334,16 @@ function updateImgToggleBtn(){
   btn.style.borderColor = showProductImages ? 'var(--accent)' : 'var(--border)';
   btn.style.color = showProductImages ? '#93c5fd' : 'var(--sub)';
   btn.style.background = showProductImages ? '#2563eb22' : 'var(--card)';
+}
+
+function updateViewToggleBtn(){
+  const btn = document.getElementById('viewToggleBtn');
+  if(!btn) return;
+  const isRow = viewMode === 'row';
+  btn.textContent = isRow ? '☰' : '▦';
+  btn.style.borderColor = isRow ? 'var(--accent)' : 'var(--border)';
+  btn.style.color = isRow ? '#93c5fd' : 'var(--sub)';
+  btn.style.background = isRow ? '#2563eb22' : 'var(--card)';
 }
 let productsCache = {};
 let cart = {}; // cartKey -> {productId, name, price, qty, discount, unit}
@@ -443,6 +471,7 @@ function renderMainContent(){
           <input type="text" id="searchBox" placeholder="🔍 ค้นหาชื่อสินค้า หรือรหัส/บาร์โค้ด">
           <div class="scan-btn" id="scanBtn">📷</div>
           <div class="scan-btn" id="imgToggleBtn" title="แสดง/ซ่อนรูปภาพสินค้า">🖼️</div>
+          <div class="scan-btn" id="viewToggleBtn" title="สลับมุมมองรายการ">▦</div>
         </div>
         <div id="productGrid" class="product-grid"></div>
       </div>
@@ -459,6 +488,14 @@ function renderMainContent(){
       document.getElementById('searchBox').value = code;
       renderProductGrid();
     });
+  };
+  updateViewToggleBtn();
+  document.getElementById('productGrid').classList.toggle('row-view', viewMode === 'row');
+  document.getElementById('viewToggleBtn').onclick = ()=>{
+    viewMode = viewMode === 'grid' ? 'row' : 'grid';
+    localStorage.setItem('sellViewMode', viewMode);
+    updateViewToggleBtn();
+    document.getElementById('productGrid').classList.toggle('row-view', viewMode === 'row');
   };
   updateImgToggleBtn();
   document.getElementById('imgToggleBtn').onclick = ()=>{
@@ -532,10 +569,12 @@ function renderProductGrid(){
       : `<div class="pimg-fallback">🥤</div>`);
     return `<div class="product-card" data-id="${id}">
       ${imgHtml}
-      <div class="pname">${p.name||'(ไม่มีชื่อ)'}</div>
-      <div class="pmeta">${p.category||'ไม่ระบุหมวด'}</div>
+      <div class="pinfo">
+        <div class="pname">${p.name||'(ไม่มีชื่อ)'}</div>
+        <div class="pmeta">${p.category||'ไม่ระบุหมวด'}</div>
+        <div class="pstock ${stockClass}">${stockLabel}</div>
+      </div>
       <div class="pprice">฿${(p.sellPrice||0).toLocaleString()}</div>
-      <div class="pstock ${stockClass}">${stockLabel}</div>
     </div>`;
   }).join('');
 
