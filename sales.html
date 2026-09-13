@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>รายการขาย</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --warn:#fbbf24; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:14px; padding-bottom:60px;
+  }
+  .wrap{ max-width:640px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .topbar h1{ font-family:'Kanit'; font-size:18px; }
+  .topbar .who{ font-size:11px; color:var(--sub); text-align:right; }
+
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+  }
+  .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .current-shop-banner{
+    display:flex; align-items:center; gap:8px; background:#2563eb22; border:1px solid var(--accent);
+    border-radius:14px; padding:10px 14px; margin-bottom:12px; font-family:'Kanit'; font-size:14px; color:#93c5fd;
+  }
+  .current-shop-banner .pin{ font-size:16px; }
+
+  .filter-row{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .filter-row::-webkit-scrollbar{ display:none; }
+  .filter-chip{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:7px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap;
+  }
+  .filter-chip.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+  .custom-range{ display:none; gap:8px; margin-bottom:12px; }
+  .custom-range.show{ display:flex; }
+  .custom-range input{ flex:1; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:13px; }
+
+  .summary-bar{
+    display:flex; justify-content:space-between; background:var(--card); border:1px solid var(--border);
+    border-radius:14px; padding:12px 16px; margin-bottom:12px; font-family:'Kanit'; font-size:13px;
+  }
+  .summary-bar b{ color:#93c5fd; font-size:15px; }
+
+  .bill-item{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:13px 14px; margin-bottom:9px; cursor:pointer;
+  }
+  .bill-item .brow{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .bill-item .btime{ font-family:'Kanit'; font-size:14px; }
+  .bill-item .bmeta{ font-size:11.5px; color:var(--sub); margin-top:3px; }
+  .bill-item .btotal{ font-family:'Kanit'; font-size:16px; color:#93c5fd; }
+  .status-badge{ font-size:10px; padding:1px 8px; border-radius:20px; font-family:'Kanit'; margin-top:5px; display:inline-block; }
+  .status-badge.paid{ background:#22c55e33; color:#4ade80; }
+  .status-badge.unpaid{ background:#ef444433; color:#f87171; }
+  .status-badge.returned{ background:#fbbf2433; color:#fbbf24; }
+  .status-badge.cancelled{ background:#64748b33; color:#94a3b8; }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:30px 14px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); display:none;
+    align-items:flex-end; justify-content:center; z-index:60;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-sheet{
+    background:#0b1222; border-radius:22px 22px 0 0; width:100%; max-width:600px;
+    padding:20px; max-height:85vh; overflow-y:auto;
+  }
+  .modal-sheet h2{ font-family:'Kanit'; font-size:16px; margin-bottom:12px; }
+  .detail-line{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; color:var(--sub); }
+  .detail-line.item{ color:var(--text); }
+  .detail-line.grand{ font-family:'Kanit'; font-size:18px; color:var(--text); border-top:1px solid var(--border); margin-top:8px; padding-top:10px; }
+  .modal-actions{ display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+  .modal-actions button{
+    padding:12px; border-radius:12px; border:1px solid var(--border); background:#0f172a;
+    color:var(--text); font-family:'Kanit'; font-size:13.5px; cursor:pointer;
+  }
+  .modal-actions button.danger{ border-color:var(--danger); color:var(--danger); }
+  .modal-actions button.primary{ background:var(--accent); border:none; color:#fff; }
+
+  #printArea{ position:absolute; left:-9999px; top:0; width:320px; background:#fff; color:#000; padding:16px; font-family:'Sarabun'; }
+  #printArea h2{ font-family:'Kanit'; text-align:center; font-size:16px; margin-bottom:6px; }
+  #printArea .pline{ display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
+  #printArea .ptotal{ font-weight:bold; font-size:14px; border-top:1px solid #000; margin-top:6px; padding-top:6px; }
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; left:0; top:0; }
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังตรวจสอบสิทธิ์...</div></div>
+<div id="printArea"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(session.role !== 'admin' && !(session.permissions && session.permissions.viewReport)){
+  app.innerHTML = `<div class="blocked"><h1>ไม่มีสิทธิ์ดูรายการขาย</h1><p>บัญชีนี้ไม่ได้รับสิทธิ์ "ดูรายงาน" กรุณาติดต่อแอดมิน</p><br><a href="login.html" style="color:#3b82f6;">กลับหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let branchOptions = [];
+let currentBranch = null;
+let billsCache = {};
+let activeRange = 'today';
+
+function boot(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    buildBranchOptions();
+    renderShell();
+  });
+}
+
+function buildBranchOptions(){
+  branchOptions = [];
+  Object.keys(shopsCache).forEach(shopId=>{
+    const shop = shopsCache[shopId];
+    const info = shop.info || {};
+    const branches = shop.branches || {};
+    const branchIds = Object.keys(branches);
+    let allowed = branchIds;
+    if(session.role !== 'admin'){
+      const access = session.access || {};
+      if(!access[shopId]) return;
+      allowed = branchIds.filter(bid => access[shopId][bid]);
+    }
+    allowed.forEach(bid=>{
+      branchOptions.push({ shopId, shopName: info.name, branchId: bid, branchName: branches[bid].name });
+    });
+  });
+  if(!currentBranch && branchOptions.length){
+    currentBranch = pickInitialBranch(branchOptions);
+  }
+}
+
+function pickInitialBranch(options){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+  if(saved && options.some(b=>b.shopId===saved.shopId && b.branchId===saved.branchId)){
+    return { shopId: saved.shopId, branchId: saved.branchId };
+  }
+  return { shopId: options[0].shopId, branchId: options[0].branchId };
+}
+
+function renderShell(){
+  const roleLabel = {admin:'ADMIN', owner:'OWNER', staff:'STAFF'}[session.role] || session.role;
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <h1>🧾 รายการขาย</h1>
+        <div class="who">${session.name}<br><span style="color:#93c5fd">${roleLabel}</span></div>
+      </div>
+      <div class="nav-bar" id="navBar"></div>
+      <div class="current-shop-banner" id="currentShopBanner"></div>
+      <div id="mainContent"></div>
+    </div>
+    <div class="modal-overlay" id="modalOverlay"><div class="modal-sheet" id="modalSheet"></div></div>
+  `;
+  document.getElementById('modalOverlay').onclick = (e)=>{ if(e.target.id==='modalOverlay') closeModal(); };
+  renderNavBar();
+  renderBanner();
+  renderMainContent();
+}
+
+function renderNavBar(){
+  const wrap = document.getElementById('navBar');
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'sales.html', icon:'🧾', label:'รายการขาย', show:true },
+    { href:'reports.html', icon:'📈', label:'รายงาน', show: session.role==='admin' || (session.permissions&&session.permissions.viewReport) },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+  ];
+  wrap.innerHTML = items.filter(i=>i.show).map(i=>
+    `<a class="nav-item ${i.href==='sales.html'?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
+}
+
+function renderBanner(){
+  const banner = document.getElementById('currentShopBanner');
+  if(!banner) return;
+  if(branchOptions.length === 0){
+    banner.style.display = 'flex';
+    banner.innerHTML = `ยังไม่มีร้าน/สาขาที่เข้าถึงได้`;
+    return;
+  }
+  const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
+  if(cur){
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span class="pin">📍</span> กำลังดูรายการขายร้าน: <b>${cur.shopName} · ${cur.branchName}</b><a href="home.html" style="margin-left:auto; color:inherit; text-decoration:underline; font-size:12px;">🔄 เปลี่ยนร้าน</a>`;
+  }
+}
+
+function renderMainContent(){
+  const content = document.getElementById('mainContent');
+  if(!currentBranch){
+    content.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขา — ไปเพิ่มร้านที่ shops.html ก่อน</div>`;
+    return;
+  }
+  content.innerHTML = `
+    <div class="filter-row" id="filterRow">
+      <div class="filter-chip ${activeRange==='today'?'active':''}" data-r="today">วันนี้</div>
+      <div class="filter-chip ${activeRange==='yesterday'?'active':''}" data-r="yesterday">เมื่อวาน</div>
+      <div class="filter-chip ${activeRange==='7d'?'active':''}" data-r="7d">7 วัน</div>
+      <div class="filter-chip ${activeRange==='month'?'active':''}" data-r="month">เดือนนี้</div>
+      <div class="filter-chip ${activeRange==='custom'?'active':''}" data-r="custom">กำหนดวันที่</div>
+    </div>
+    <div class="custom-range ${activeRange==='custom'?'show':''}" id="customRange">
+      <input type="date" id="rangeFrom">
+      <input type="date" id="rangeTo">
+    </div>
+    <div class="summary-bar" id="summaryBar"></div>
+    <div id="billList"></div>
+  `;
+  document.querySelectorAll('.filter-chip').forEach(el=>{
+    el.onclick = ()=>{
+      activeRange = el.dataset.r;
+      renderMainContent();
+    };
+  });
+  if(activeRange === 'custom'){
+    document.getElementById('rangeFrom').onchange = renderBillList;
+    document.getElementById('rangeTo').onchange = renderBillList;
+  }
+
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/bills`;
+  db.ref(basePath).on('value', snap=>{
+    billsCache = snap.val() || {};
+    renderBillList();
+  });
+}
+
+function getRangeBounds(){
+  const now = new Date();
+  let start, end;
+  if(activeRange === 'today'){
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    end = new Date(start.getTime() + 86400000 - 1);
+  } else if(activeRange === 'yesterday'){
+    const y = new Date(now); y.setDate(y.getDate()-1);
+    start = new Date(y.getFullYear(), y.getMonth(), y.getDate());
+    end = new Date(start.getTime() + 86400000 - 1);
+  } else if(activeRange === '7d'){
+    start = new Date(now.getTime() - 6*86400000);
+    start = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59);
+  } else if(activeRange === 'month'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59);
+  } else {
+    const fromVal = document.getElementById('rangeFrom')?.value;
+    const toVal = document.getElementById('rangeTo')?.value;
+    start = fromVal ? new Date(fromVal) : new Date(0);
+    end = toVal ? new Date(toVal + 'T23:59:59') : new Date();
+  }
+  return { start, end };
+}
+
+function renderBillList(){
+  const listEl = document.getElementById('billList');
+  const summaryEl = document.getElementById('summaryBar');
+  if(!listEl) return;
+  const { start, end } = getRangeBounds();
+
+  let ids = Object.keys(billsCache).filter(id=>{
+    const d = new Date(billsCache[id].date);
+    return d >= start && d <= end;
+  });
+  ids.sort((a,b)=> billsCache[b].date - billsCache[a].date);
+
+  const activeBills = ids.filter(id => billsCache[id].status !== 'cancelled');
+  const totalRevenue = activeBills.reduce((s,id)=> s + (billsCache[id].total||0), 0);
+  summaryEl.innerHTML = `<span>จำนวนบิล ${ids.length} บิล</span><b>฿${totalRevenue.toLocaleString()}</b>`;
+
+  if(ids.length === 0){
+    listEl.innerHTML = `<div class="empty-note">ไม่มีรายการขายในช่วงเวลานี้</div>`;
+    return;
+  }
+
+  const methodLabel = {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'};
+  listEl.innerHTML = ids.map(id=>{
+    const b = billsCache[id];
+    const time = new Date(b.date).toLocaleString('th-TH', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const status = b.status || 'paid';
+    const statusLabel = {paid:'ชำระแล้ว', unpaid:'ค้างชำระ', returned:'คืนสินค้าแล้ว', cancelled:'ยกเลิกแล้ว'}[status] || status;
+    return `<div class="bill-item" data-id="${id}">
+      <div class="brow">
+        <div>
+          <div class="btime">${time}</div>
+          <div class="bmeta">${b.items.length} รายการ · ${methodLabel[b.paymentMethod]||'-'} · ${b.staffName}</div>
+          <span class="status-badge ${status}">${statusLabel}</span>
+        </div>
+        <div class="btotal">฿${b.total.toLocaleString()}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.bill-item').forEach(el=>{
+    el.onclick = ()=> openBillDetail(el.dataset.id);
+  });
+}
+
+function openBillDetail(billId){
+  const b = billsCache[billId];
+  const methodLabel = {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'};
+  const status = b.status || 'paid';
+  const sheet = document.getElementById('modalSheet');
+  sheet.innerHTML = `
+    <h2>รายละเอียดบิล</h2>
+    ${b.items.map(it=>`<div class="detail-line item"><span>${it.name} x${it.qty}</span><span>฿${(it.price*it.qty - (it.discount||0)).toLocaleString()}</span></div>`).join('')}
+    <div class="detail-line"><span>ยอดรวมสินค้า</span><span>฿${b.subtotal.toLocaleString()}</span></div>
+    <div class="detail-line"><span>ส่วนลดบิล</span><span>-฿${(b.billDiscount||0).toLocaleString()}</span></div>
+    <div class="detail-line grand"><span>ยอดสุทธิ</span><span>฿${b.total.toLocaleString()}</span></div>
+    <div class="detail-line" style="margin-top:10px"><span>วิธีชำระ</span><span>${methodLabel[b.paymentMethod]||'-'}</span></div>
+    ${b.paymentMethod==='cash' ? `<div class="detail-line"><span>รับเงิน / ทอน</span><span>฿${(b.cashReceived||0).toLocaleString()} / ฿${(b.change||0).toLocaleString()}</span></div>` : ''}
+    <div class="detail-line"><span>พนักงาน</span><span>${b.staffName}</span></div>
+    <div class="detail-line"><span>สถานะ</span><span>${status}</span></div>
+    <div class="modal-actions">
+      <button class="primary" id="printBillBtn">🖨️ พิมพ์ใบเสร็จ</button>
+      ${status==='paid' ? `<button id="returnBillBtn">↩️ คืนสินค้า (คืนทั้งบิล)</button>` : ''}
+      ${status!=='cancelled' && status!=='returned' ? `<button class="danger" id="cancelBillBtn">✕ ยกเลิกบิล</button>` : ''}
+      <button id="closeBtn">ปิด</button>
+    </div>
+  `;
+  document.getElementById('printBillBtn').onclick = ()=> printBill(b);
+  document.getElementById('closeBtn').onclick = closeModal;
+  const returnBtn = document.getElementById('returnBillBtn');
+  if(returnBtn) returnBtn.onclick = ()=> confirmBillAction(billId, 'return');
+  const cancelBtn = document.getElementById('cancelBillBtn');
+  if(cancelBtn) cancelBtn.onclick = ()=> confirmBillAction(billId, 'cancel');
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function confirmBillAction(billId, action){
+  const label = action === 'return' ? 'คืนสินค้าทั้งบิลนี้' : 'ยกเลิกบิลนี้';
+  if(!confirm(`ยืนยัน "${label}"? ระบบจะคืนสต็อกสินค้าทั้งหมดในบิลกลับเข้าคลัง`)) return;
+
+  const b = billsCache[billId];
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+  const logType = action === 'return' ? 'return' : 'adjust-up';
+  const reason = action === 'return' ? 'ลูกค้าคืนสินค้า' : 'ยกเลิกบิล';
+
+  const promises = b.items.map(it=>
+    db.ref(`${basePath}/products/${it.productId}/stock`).transaction(cur=> (cur||0) + it.qty)
+      .then(()=> db.ref(`${basePath}/stockLog`).push().set({
+        type: logType, productId: it.productId, productName: it.name, qty: it.qty,
+        staffName: session.name, reason, date: Date.now()
+      }))
+  );
+  Promise.all(promises).then(()=>{
+    return db.ref(`${basePath}/bills/${billId}/status`).set(action === 'return' ? 'returned' : 'cancelled');
+  }).then(()=>{
+    closeModal();
+  }).catch(err=>{
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+  });
+}
+
+function printBill(b){
+  const methodLabel = {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'};
+  const area = document.getElementById('printArea');
+  area.innerHTML = `
+    <h2>ใบเสร็จรับเงิน</h2>
+    <div class="pline"><span>วันที่</span><span>${new Date(b.date).toLocaleString('th-TH')}</span></div>
+    <div class="pline"><span>พนักงาน</span><span>${b.staffName}</span></div>
+    <div style="margin:8px 0; border-top:1px dashed #000;"></div>
+    ${b.items.map(it=>`<div class="pline"><span>${it.name} x${it.qty}</span><span>฿${(it.price*it.qty-(it.discount||0)).toLocaleString()}</span></div>`).join('')}
+    <div class="pline ptotal"><span>ยอดสุทธิ</span><span>฿${b.total.toLocaleString()}</span></div>
+    <div class="pline"><span>ชำระโดย</span><span>${methodLabel[b.paymentMethod]||'-'}</span></div>
+  `;
+  setTimeout(()=> window.print(), 300);
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+</script>
+</body>
+</html>

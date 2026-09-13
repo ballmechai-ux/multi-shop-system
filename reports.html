@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>รายงาน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --warn:#fbbf24; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:14px; padding-bottom:60px;
+  }
+  .wrap{ max-width:680px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .topbar h1{ font-family:'Kanit'; font-size:18px; }
+  .topbar .who{ font-size:11px; color:var(--sub); text-align:right; }
+
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+  }
+  .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .current-shop-banner{
+    display:flex; align-items:center; gap:8px; background:#2563eb22; border:1px solid var(--accent);
+    border-radius:14px; padding:10px 14px; margin-bottom:12px; font-family:'Kanit'; font-size:14px; color:#93c5fd;
+  }
+  .current-shop-banner .pin{ font-size:16px; }
+
+  .report-tabs{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .report-tabs::-webkit-scrollbar{ display:none; }
+  .report-tab{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:8px 14px; font-size:12.5px; color:var(--sub); cursor:pointer; white-space:nowrap; font-family:'Kanit';
+  }
+  .report-tab.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .filter-row{ display:flex; gap:8px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .filter-row::-webkit-scrollbar{ display:none; }
+  .filter-chip{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:7px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap;
+  }
+  .filter-chip.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+  .custom-range{ display:none; gap:8px; margin-bottom:12px; }
+  .custom-range.show{ display:flex; }
+  .custom-range input{ flex:1; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:13px; }
+
+  .kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+  .kpi{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
+  .kpi .label{ font-size:11.5px; color:var(--sub); }
+  .kpi .value{ font-family:'Kanit'; font-size:20px; margin-top:4px; color:#93c5fd; }
+  .kpi .value.ok{ color:var(--ok); }
+  .kpi .value.warn{ color:var(--warn); }
+  .kpi .value.danger{ color:var(--danger); }
+
+  .report-row{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:11px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .report-row .rname{ font-family:'Kanit'; font-size:13.5px; }
+  .report-row .rmeta{ font-size:11.5px; color:var(--sub); margin-top:2px; }
+  .report-row .rval{ font-family:'Kanit'; font-size:14.5px; color:#93c5fd; text-align:right; white-space:nowrap; }
+  .rank-badge{
+    width:24px; height:24px; border-radius:50%; background:#0f172a; border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; font-family:'Kanit'; font-size:12px; flex:0 0 auto;
+  }
+
+  .print-btn{
+    background:transparent; border:1px solid var(--border); border-radius:10px; color:var(--sub);
+    padding:8px 14px; font-family:'Kanit'; font-size:12.5px; cursor:pointer; margin-bottom:12px;
+  }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:30px 14px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+
+  #printArea{ position:absolute; left:-9999px; top:0; width:380px; background:#fff; color:#000; padding:16px; font-family:'Sarabun'; }
+  #printArea h2{ font-family:'Kanit'; font-size:16px; margin-bottom:8px; }
+  #printArea .pline{ display:flex; justify-content:space-between; font-size:12px; padding:3px 0; }
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; left:0; top:0; }
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังตรวจสอบสิทธิ์...</div></div>
+<div id="printArea"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(session.role !== 'admin' && !(session.permissions && session.permissions.viewReport)){
+  app.innerHTML = `<div class="blocked"><h1>ไม่มีสิทธิ์ดูรายงาน</h1><p>บัญชีนี้ไม่ได้รับสิทธิ์ "ดูรายงาน" กรุณาติดต่อแอดมิน</p><br><a href="login.html" style="color:#3b82f6;">กลับหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let branchOptions = [];
+let currentBranch = null;
+let billsCache = {};
+let productsCache = {};
+let debtorsCache = {};
+let activeTab = 'sales';
+let activeRange = 'today';
+
+function boot(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    buildBranchOptions();
+    renderShell();
+  });
+}
+
+function buildBranchOptions(){
+  branchOptions = [];
+  Object.keys(shopsCache).forEach(shopId=>{
+    const shop = shopsCache[shopId];
+    const info = shop.info || {};
+    const branches = shop.branches || {};
+    const branchIds = Object.keys(branches);
+    let allowed = branchIds;
+    if(session.role !== 'admin'){
+      const access = session.access || {};
+      if(!access[shopId]) return;
+      allowed = branchIds.filter(bid => access[shopId][bid]);
+    }
+    allowed.forEach(bid=>{
+      branchOptions.push({ shopId, shopName: info.name, branchId: bid, branchName: branches[bid].name });
+    });
+  });
+  if(!currentBranch && branchOptions.length){
+    currentBranch = pickInitialBranch(branchOptions);
+  }
+}
+
+function pickInitialBranch(options){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+  if(saved && options.some(b=>b.shopId===saved.shopId && b.branchId===saved.branchId)){
+    return { shopId: saved.shopId, branchId: saved.branchId };
+  }
+  return { shopId: options[0].shopId, branchId: options[0].branchId };
+}
+
+function renderShell(){
+  const roleLabel = {admin:'ADMIN', owner:'OWNER', staff:'STAFF'}[session.role] || session.role;
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <h1>📈 รายงาน</h1>
+        <div class="who">${session.name}<br><span style="color:#93c5fd">${roleLabel}</span></div>
+      </div>
+      <div class="nav-bar" id="navBar"></div>
+      <div class="current-shop-banner" id="currentShopBanner"></div>
+      <div id="mainContent"></div>
+    </div>
+  `;
+  renderNavBar();
+  renderBanner();
+  renderMainContent();
+}
+
+function renderNavBar(){
+  const wrap = document.getElementById('navBar');
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'sales.html', icon:'🧾', label:'รายการขาย', show:true },
+    { href:'reports.html', icon:'📈', label:'รายงาน', show:true },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+  ];
+  wrap.innerHTML = items.filter(i=>i.show).map(i=>
+    `<a class="nav-item ${i.href==='reports.html'?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
+}
+
+function renderBanner(){
+  const banner = document.getElementById('currentShopBanner');
+  if(!banner) return;
+  if(branchOptions.length === 0){
+    banner.style.display = 'flex';
+    banner.innerHTML = `ยังไม่มีร้าน/สาขาที่เข้าถึงได้`;
+    return;
+  }
+  const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
+  if(cur){
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span class="pin">📍</span> กำลังดูรายงานร้าน: <b>${cur.shopName} · ${cur.branchName}</b><a href="home.html" style="margin-left:auto; color:inherit; text-decoration:underline; font-size:12px;">🔄 เปลี่ยนร้าน</a>`;
+  }
+}
+
+function renderMainContent(){
+  const content = document.getElementById('mainContent');
+  if(!currentBranch){
+    content.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขา — ไปเพิ่มร้านที่ shops.html ก่อน</div>`;
+    return;
+  }
+  content.innerHTML = `
+    <div class="report-tabs" id="reportTabs">
+      <div class="report-tab ${activeTab==='sales'?'active':''}" data-t="sales">📈 ยอดขาย</div>
+      <div class="report-tab ${activeTab==='profit'?'active':''}" data-t="profit">💰 กำไร</div>
+      <div class="report-tab ${activeTab==='stock'?'active':''}" data-t="stock">📦 สต็อก</div>
+      <div class="report-tab ${activeTab==='best'?'active':''}" data-t="best">🏆 สินค้าขายดี</div>
+      <div class="report-tab ${activeTab==='debt'?'active':''}" data-t="debt">👤 ลูกหนี้</div>
+      <div class="report-tab ${activeTab==='payment'?'active':''}" data-t="payment">💵 การรับชำระ</div>
+    </div>
+    <div class="filter-row" id="filterRow">
+      <div class="filter-chip ${activeRange==='today'?'active':''}" data-r="today">วันนี้</div>
+      <div class="filter-chip ${activeRange==='week'?'active':''}" data-r="week">สัปดาห์</div>
+      <div class="filter-chip ${activeRange==='month'?'active':''}" data-r="month">เดือน</div>
+      <div class="filter-chip ${activeRange==='year'?'active':''}" data-r="year">ปี</div>
+      <div class="filter-chip ${activeRange==='custom'?'active':''}" data-r="custom">กำหนดเอง</div>
+    </div>
+    <div class="custom-range ${activeRange==='custom'?'show':''}" id="customRange">
+      <input type="date" id="rangeFrom">
+      <input type="date" id="rangeTo">
+    </div>
+    <button class="print-btn" id="printReportBtn">🖨️ พิมพ์รายงานนี้</button>
+    <div id="reportBody"></div>
+  `;
+  document.querySelectorAll('.report-tab').forEach(el=>{
+    el.onclick = ()=>{ activeTab = el.dataset.t; renderMainContent(); };
+  });
+  document.querySelectorAll('.filter-chip').forEach(el=>{
+    el.onclick = ()=>{ activeRange = el.dataset.r; renderMainContent(); };
+  });
+  if(activeRange === 'custom'){
+    document.getElementById('rangeFrom').onchange = loadAndRender;
+    document.getElementById('rangeTo').onchange = loadAndRender;
+  }
+  document.getElementById('printReportBtn').onclick = printCurrentReport;
+
+  loadAndRender();
+}
+
+function getRangeBounds(){
+  const now = new Date();
+  let start, end;
+  if(activeRange === 'today'){
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    end = new Date(start.getTime() + 86400000 - 1);
+  } else if(activeRange === 'week'){
+    start = new Date(now.getTime() - 6*86400000);
+    start = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23,59,59);
+  } else if(activeRange === 'month'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59);
+  } else if(activeRange === 'year'){
+    start = new Date(now.getFullYear(), 0, 1);
+    end = new Date(now.getFullYear(), 11, 31, 23,59,59);
+  } else {
+    const fromVal = document.getElementById('rangeFrom')?.value;
+    const toVal = document.getElementById('rangeTo')?.value;
+    start = fromVal ? new Date(fromVal) : new Date(0);
+    end = toVal ? new Date(toVal + 'T23:59:59') : new Date();
+  }
+  return { start, end };
+}
+
+function loadAndRender(){
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+  Promise.all([
+    db.ref(basePath + '/bills').once('value'),
+    db.ref(basePath + '/products').once('value'),
+    db.ref(basePath + '/debtors').once('value')
+  ]).then(([billsSnap, productsSnap, debtorsSnap])=>{
+    billsCache = billsSnap.val() || {};
+    productsCache = productsSnap.val() || {};
+    debtorsCache = debtorsSnap.val() || {};
+    renderReportBody();
+  });
+}
+
+function getFilteredBills(){
+  const { start, end } = getRangeBounds();
+  return Object.values(billsCache).filter(b=>{
+    const d = new Date(b.date);
+    return d >= start && d <= end && b.status !== 'cancelled';
+  });
+}
+
+function renderReportBody(){
+  const body = document.getElementById('reportBody');
+  if(!body) return;
+  if(activeTab === 'sales') return renderSalesReport(body);
+  if(activeTab === 'profit') return renderProfitReport(body);
+  if(activeTab === 'stock') return renderStockReport(body);
+  if(activeTab === 'best') return renderBestSellerReport(body);
+  if(activeTab === 'debt') return renderDebtReport(body);
+  if(activeTab === 'payment') return renderPaymentReport(body);
+}
+
+function renderSalesReport(body){
+  const bills = getFilteredBills();
+  const total = bills.reduce((s,b)=> s + b.total, 0);
+  const count = bills.length;
+  const avg = count ? total / count : 0;
+  body.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">ยอดขายรวม</div><div class="value">฿${total.toLocaleString()}</div></div>
+      <div class="kpi"><div class="label">จำนวนบิล</div><div class="value">${count.toLocaleString()}</div></div>
+      <div class="kpi" style="grid-column:1/-1"><div class="label">ยอดเฉลี่ยต่อบิล</div><div class="value">฿${avg.toLocaleString(undefined,{maximumFractionDigits:0})}</div></div>
+    </div>
+    ${count === 0 ? '<div class="empty-note">ไม่มียอดขายในช่วงเวลานี้</div>' : ''}
+  `;
+}
+
+function renderProfitReport(body){
+  const bills = getFilteredBills();
+  let revenue = 0, cogs = 0;
+  bills.forEach(b=>{
+    revenue += b.total;
+    b.items.forEach(it=>{
+      const p = productsCache[it.productId];
+      const cost = p ? (p.costPrice||0) : 0;
+      cogs += cost * it.qty;
+    });
+  });
+  const profit = revenue - cogs;
+  const margin = revenue ? (profit/revenue*100) : 0;
+  body.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">ยอดขาย</div><div class="value">฿${revenue.toLocaleString()}</div></div>
+      <div class="kpi"><div class="label">ต้นทุนสินค้า (ประมาณ)</div><div class="value warn">฿${cogs.toLocaleString()}</div></div>
+      <div class="kpi" style="grid-column:1/-1"><div class="label">กำไรขั้นต้น</div><div class="value ok">฿${profit.toLocaleString()} (${margin.toFixed(1)}%)</div></div>
+    </div>
+    <div class="empty-note">* คำนวณจากราคาทุนปัจจุบันของสินค้า อาจคลาดเคลื่อนถ้าราคาทุนเคยเปลี่ยนแปลง</div>
+  `;
+}
+
+function renderStockReport(body){
+  const ids = Object.keys(productsCache);
+  if(ids.length === 0){ body.innerHTML = `<div class="empty-note">ยังไม่มีสินค้าในร้าน/สาขานี้</div>`; return; }
+  let totalValue = 0, totalUnits = 0;
+  const rows = ids.map(id=>{
+    const p = productsCache[id];
+    const stock = p.stock ?? 0;
+    const value = stock * (p.costPrice||0);
+    totalValue += value; totalUnits += stock;
+    return `<div class="report-row">
+      <div><div class="rname">${p.name}</div><div class="rmeta">${p.category||'ไม่ระบุหมวด'}</div></div>
+      <div class="rval">${stock} ${p.unit||''}<br><span style="font-size:11px; color:var(--sub)">฿${value.toLocaleString()}</span></div>
+    </div>`;
+  }).join('');
+  body.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">จำนวนสินค้าทั้งหมด (หน่วย)</div><div class="value">${totalUnits.toLocaleString()}</div></div>
+      <div class="kpi"><div class="label">มูลค่าสต็อกรวม (ราคาทุน)</div><div class="value">฿${totalValue.toLocaleString()}</div></div>
+    </div>
+    ${rows}
+    <div class="empty-note">* เป็นค่าสต็อก ณ ปัจจุบัน ไม่ขึ้นกับช่วงเวลาที่เลือก</div>
+  `;
+}
+
+function renderBestSellerReport(body){
+  const bills = getFilteredBills();
+  const agg = {};
+  bills.forEach(b=>{
+    b.items.forEach(it=>{
+      if(!agg[it.productId]) agg[it.productId] = { name: it.name, qty:0, revenue:0 };
+      agg[it.productId].qty += it.qty;
+      agg[it.productId].revenue += it.price*it.qty - (it.discount||0);
+    });
+  });
+  const rows = Object.values(agg).sort((a,b)=> b.qty - a.qty);
+  if(rows.length === 0){ body.innerHTML = `<div class="empty-note">ไม่มีข้อมูลการขายในช่วงเวลานี้</div>`; return; }
+  body.innerHTML = rows.map((r,i)=>`
+    <div class="report-row">
+      <div class="rank-badge">${i+1}</div>
+      <div style="flex:1"><div class="rname">${r.name}</div><div class="rmeta">ขายได้ ${r.qty} ชิ้น</div></div>
+      <div class="rval">฿${r.revenue.toLocaleString()}</div>
+    </div>
+  `).join('');
+}
+
+function renderDebtReport(body){
+  const { start, end } = getRangeBounds();
+  const ids = Object.keys(debtorsCache).filter(id=>{
+    const d = new Date(debtorsCache[id].date);
+    return d >= start && d <= end;
+  });
+  const unpaidIds = ids.filter(id => debtorsCache[id].status !== 'paid');
+  const totalOwed = unpaidIds.reduce((s,id)=> s + (debtorsCache[id].total - (debtorsCache[id].amountPaid||0)), 0);
+  body.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">รายการค้างชำระ</div><div class="value">${unpaidIds.length.toLocaleString()}</div></div>
+      <div class="kpi"><div class="label">ยอดค้างชำระรวม</div><div class="value danger">฿${totalOwed.toLocaleString()}</div></div>
+    </div>
+    ${ids.length === 0 ? '<div class="empty-note">ไม่มีรายการลูกหนี้ในช่วงเวลานี้</div>' : ids.map(id=>{
+      const d = debtorsCache[id];
+      const owed = d.total - (d.amountPaid||0);
+      return `<div class="report-row">
+        <div><div class="rname">${d.customer.firstName} ${d.customer.lastName}</div><div class="rmeta">${d.docNo} · ${new Date(d.date).toLocaleDateString('th-TH')}</div></div>
+        <div class="rval">${d.status==='paid' ? '<span style="color:var(--ok)">ชำระแล้ว</span>' : '฿'+owed.toLocaleString()}</div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function renderPaymentReport(body){
+  const bills = getFilteredBills().filter(b=> (b.status||'paid') === 'paid');
+  const byMethod = { cash:0, transfer:0, qr:0, other:0 };
+  bills.forEach(b=>{ byMethod[b.paymentMethod] = (byMethod[b.paymentMethod]||0) + b.total; });
+  const methodLabel = {cash:'💵 เงินสด',transfer:'🏦 โอนเงิน',qr:'📱 QR Payment',other:'➕ อื่นๆ'};
+  const total = Object.values(byMethod).reduce((s,v)=>s+v,0);
+  body.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi" style="grid-column:1/-1"><div class="label">ยอดรับชำระรวม</div><div class="value">฿${total.toLocaleString()}</div></div>
+    </div>
+    ${Object.keys(byMethod).map(m=>`
+      <div class="report-row">
+        <div class="rname">${methodLabel[m]}</div>
+        <div class="rval">฿${byMethod[m].toLocaleString()}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function printCurrentReport(){
+  const shop = shopsCache[currentBranch.shopId];
+  const branch = shop.branches[currentBranch.branchId];
+  const { start, end } = getRangeBounds();
+  const tabLabel = {sales:'ยอดขาย',profit:'กำไร',stock:'สต็อก',best:'สินค้าขายดี',debt:'ลูกหนี้',payment:'การรับชำระ'}[activeTab];
+  const area = document.getElementById('printArea');
+  area.innerHTML = `
+    <h2>รายงาน${tabLabel} — ${shop.info.name} (${branch.name})</h2>
+    <div class="pline"><span>ช่วงเวลา</span><span>${start.toLocaleDateString('th-TH')} - ${end.toLocaleDateString('th-TH')}</span></div>
+    <div style="margin:8px 0; border-top:1px dashed #000;"></div>
+    <div id="printReportContent" style="color:#000"></div>
+  `;
+  // Re-render the current report body's text content into the printable area (strip dark-theme styling)
+  const bodyClone = document.getElementById('reportBody').cloneNode(true);
+  bodyClone.querySelectorAll('*').forEach(el=>{ el.style.color = '#000'; el.style.background = 'transparent'; });
+  document.getElementById('printReportContent').appendChild(bodyClone);
+  setTimeout(()=> window.print(), 300);
+}
+</script>
+</body>
+</html>

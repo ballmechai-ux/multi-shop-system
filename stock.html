@@ -227,6 +227,9 @@ function renderNavBar(){
     { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
     { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show:true },
+    { href:'sales.html', icon:'🧾', label:'รายการขาย', show:true },
+    { href:'reports.html', icon:'📈', label:'รายงาน', show: session.role==='admin' || (session.permissions&&session.permissions.viewReport) },
     { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
     { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
   ];
@@ -421,7 +424,8 @@ function renderHistoryTab(){
     'sale': {label:'ขายออก', cls:'sale'},
     'adjust-up': {label:'ปรับเพิ่ม', cls:'adjust-up'},
     'adjust-down': {label:'ปรับลด', cls:'adjust-down'},
-    'receive': {label:'รับเข้า', cls:'receive'}
+    'receive': {label:'รับเข้า', cls:'receive'},
+    'return': {label:'คืนสินค้า', cls:'adjust-up'}
   };
   wrap.innerHTML = ids.map(id=>{
     const log = stockLogCache[id];
