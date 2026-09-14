@@ -139,6 +139,7 @@ let shopsCache = {};
 let branchOptions = [];
 let currentBranch = null;
 let billsCache = {};
+let shopSettings = {};
 let activeRange = 'today';
 
 function boot(){
@@ -266,8 +267,9 @@ function renderMainContent(){
     document.getElementById('rangeTo').onchange = renderBillList;
   }
 
-  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/bills`;
-  db.ref(basePath).on('value', snap=>{
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+  db.ref(basePath + '/settings').once('value').then(snap=>{ shopSettings = snap.val() || {}; });
+  db.ref(basePath + '/bills').on('value', snap=>{
     billsCache = snap.val() || {};
     renderBillList();
   });
@@ -402,14 +404,26 @@ function confirmBillAction(billId, action){
 function printBill(b){
   const methodLabel = {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'};
   const area = document.getElementById('printArea');
+  area.style.width = shopSettings.paperWidth === '80' ? '300px' : '220px';
+  const shopName = shopSettings.shopName || 'ร้านค้า';
+  const vatLine = shopSettings.taxInvoiceEnabled
+    ? `<div class="pline"><span>VAT ${shopSettings.vatRate ?? 7}%</span><span>฿${(b.total - b.total/(1+((shopSettings.vatRate??7)/100))).toLocaleString(undefined,{maximumFractionDigits:2})}</span></div>`
+    : '';
   area.innerHTML = `
-    <h2>ใบเสร็จรับเงิน</h2>
+    ${shopSettings.logoUrl ? `<img src="${shopSettings.logoUrl}" style="max-width:80px; display:block; margin:0 auto 6px;">` : ''}
+    <h2>${shopName}</h2>
+    ${shopSettings.address ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">${shopSettings.address}</div>` : ''}
+    ${shopSettings.phone ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">โทร. ${shopSettings.phone}</div>` : ''}
+    ${shopSettings.taxId ? `<div style="text-align:center; font-size:10.5px; margin-bottom:8px;">เลขผู้เสียภาษี ${shopSettings.taxId}</div>` : ''}
+    <div style="text-align:center; font-family:'Kanit'; font-weight:bold; margin-bottom:6px;">ใบเสร็จรับเงิน${shopSettings.taxInvoiceEnabled ? ' / ใบกำกับภาษี' : ''}</div>
     <div class="pline"><span>วันที่</span><span>${new Date(b.date).toLocaleString('th-TH')}</span></div>
     <div class="pline"><span>พนักงาน</span><span>${b.staffName}</span></div>
     <div style="margin:8px 0; border-top:1px dashed #000;"></div>
     ${b.items.map(it=>`<div class="pline"><span>${it.name} x${it.qty}</span><span>฿${(it.price*it.qty-(it.discount||0)).toLocaleString()}</span></div>`).join('')}
     <div class="pline ptotal"><span>ยอดสุทธิ</span><span>฿${b.total.toLocaleString()}</span></div>
+    ${vatLine}
     <div class="pline"><span>ชำระโดย</span><span>${methodLabel[b.paymentMethod]||'-'}</span></div>
+    ${shopSettings.receiptFooter ? `<div style="text-align:center; font-size:10.5px; margin-top:10px; border-top:1px dashed #000; padding-top:6px;">${shopSettings.receiptFooter}</div>` : ''}
   `;
   setTimeout(()=> window.print(), 300);
 }

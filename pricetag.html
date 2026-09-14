@@ -221,6 +221,7 @@ let branchOptions = [];
 let currentBranch = null;
 let productsCache = {};
 let selectedProductId = null;
+let shopSettings = {};
 
 function boot(){
   db.ref('shops').on('value', snap=>{
@@ -339,8 +340,9 @@ function renderMainContent(){
     });
   };
 
-  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/products`;
-  db.ref(basePath).on('value', snap=>{
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+  db.ref(basePath + '/settings').once('value').then(snap=>{ shopSettings = snap.val() || {}; });
+  db.ref(basePath + '/products').on('value', snap=>{
     productsCache = snap.val() || {};
     if(selectedProductId && !productsCache[selectedProductId]) selectedProductId = null;
     if(!selectedProductId){
@@ -388,7 +390,7 @@ function renderTagArea(){
     return;
   }
   const p = productsCache[selectedProductId];
-  const shopName = (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
+  const shopName = shopSettings.shopName || (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
 
   area.innerHTML = `
     <div class="card">
@@ -452,7 +454,7 @@ function generateBarcode(){
 
 function renderTagPreview(){
   const p = productsCache[selectedProductId];
-  const shopName = (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
+  const shopName = shopSettings.shopName || (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
   const discountVal = parseFloat(document.getElementById('tagDiscountPrice').value) || 0;
   const origPrice = p.sellPrice || 0;
   const showDiscount = discountVal > 0 && discountVal < origPrice;
@@ -489,7 +491,7 @@ function printBarcodeStrip(){
 
 function printPriceTags(){
   const p = productsCache[selectedProductId];
-  const shopName = (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
+  const shopName = shopSettings.shopName || (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
   const discountVal = parseFloat(document.getElementById('tagDiscountPrice').value) || 0;
   const origPrice = p.sellPrice || 0;
   const showDiscount = discountVal > 0 && discountVal < origPrice;

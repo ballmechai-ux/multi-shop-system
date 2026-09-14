@@ -102,6 +102,8 @@ try{ session = JSON.parse(sessionRaw); }catch(e){}
 let sale = null;
 try{ sale = JSON.parse(localStorage.getItem('pendingSale')); }catch(e){}
 
+let shopSettings = {};
+
 let sigCtx = null, drawing = false, hasSignature = false;
 
 if(!session){
@@ -113,7 +115,10 @@ if(!session){
       <div class="empty-note">ยังไม่มีรายการที่รอบันทึกเป็นหนี้<br><br><a href="sell.html" style="color:#3b82f6;">← กลับไปหน้าขายสินค้า</a></div>
     </div>`;
 } else {
-  render();
+  db.ref(`shops/${sale.shopId}/branches/${sale.branchId}/settings`).once('value').then(snap=>{
+    shopSettings = snap.val() || {};
+    render();
+  });
 }
 
 function render(){
@@ -258,10 +263,15 @@ function saveDebt(){
 }
 
 function printInvoice(debt){
-  const shopName = 'ร้านค้า';
   const area = document.getElementById('printArea');
+  area.style.width = shopSettings.paperWidth === '80' ? '300px' : '220px';
+  const shopName = shopSettings.shopName || 'ร้านค้า';
   area.innerHTML = `
-    <h2>ใบหนี้ / บันทึกค้างชำระ</h2>
+    ${shopSettings.logoUrl ? `<img src="${shopSettings.logoUrl}" style="max-width:80px; display:block; margin:0 auto 6px;">` : ''}
+    <h2>${shopName}</h2>
+    ${shopSettings.address ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">${shopSettings.address}</div>` : ''}
+    ${shopSettings.phone ? `<div style="text-align:center; font-size:10.5px; margin-bottom:8px;">โทร. ${shopSettings.phone}</div>` : ''}
+    <div style="text-align:center; font-family:'Kanit'; font-weight:bold; margin-bottom:6px;">ใบหนี้ / บันทึกค้างชำระ</div>
     <div class="pline"><span>เลขที่เอกสาร</span><span>${debt.docNo}</span></div>
     <div class="pline"><span>วันที่</span><span>${new Date(debt.date).toLocaleDateString('th-TH')}</span></div>
     <div class="pline"><span>ลูกค้า</span><span>${debt.customer.firstName} ${debt.customer.lastName}</span></div>
@@ -272,6 +282,7 @@ function printInvoice(debt){
     <div class="pline ptotal"><span>ยอดค้างชำระ</span><span>฿${debt.total.toLocaleString()}</span></div>
     <div style="margin-top:10px; font-size:11px;">ลายเซ็นลูกค้า</div>
     <img class="sig" src="${debt.signature}">
+    ${shopSettings.receiptFooter ? `<div style="text-align:center; font-size:10.5px; margin-top:10px; border-top:1px dashed #000; padding-top:6px;">${shopSettings.receiptFooter}</div>` : ''}
   `;
   setTimeout(()=> window.print(), 300);
 }
