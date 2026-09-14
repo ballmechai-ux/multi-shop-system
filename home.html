@@ -232,11 +232,13 @@ function renderActionStep(){
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
     { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
     { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show: isAdmin || perms.addProduct },
+    { href:'pricetag.html', icon:'🏷️', label:'ป้ายราคา', show: isAdmin || perms.addProduct },
     { href:'sales.html', icon:'🧾', label:'รายการขาย', show: true },
     { href:'reports.html', icon:'📈', label:'รายงาน', show: isAdmin || perms.viewReport },
     { href:'addproduct.html', icon:'➕', label:'เพิ่มสินค้า', show: isAdmin || perms.addProduct },
     { href:'shops.html', icon:'🏪', label:'จัดการร้าน/สาขา', show: isAdmin },
-    { href:'staffs.html', icon:'👨‍💼', label:'จัดการพนักงาน', show: isAdmin }
+    { href:'staffs.html', icon:'👨‍💼', label:'จัดการพนักงาน', show: isAdmin },
+    { href:'settings.html', icon:'⚙️', label:'ตั้งค่าร้าน', show: isAdmin || perms.manageSystem }
   ];
 
   area.innerHTML = `

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ตั้งค่าร้าน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Sarabun',sans-serif;
+    background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:14px; padding-bottom:60px;
+  }
+  .wrap{ max-width:640px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .topbar h1{ font-family:'Kanit'; font-size:18px; }
+  .topbar .who{ font-size:11px; color:var(--sub); text-align:right; }
+
+  .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+  .nav-bar::-webkit-scrollbar{ display:none; }
+  .nav-item{
+    flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:8px 14px; font-size:12px; color:var(--sub); cursor:pointer; white-space:nowrap; text-decoration:none;
+  }
+  .nav-item.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .current-shop-banner{
+    display:flex; align-items:center; gap:8px; background:#2563eb22; border:1px solid var(--accent);
+    border-radius:14px; padding:10px 14px; margin-bottom:12px; font-family:'Kanit'; font-size:14px; color:#93c5fd;
+  }
+  .current-shop-banner .pin{ font-size:16px; }
+
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:18px;
+    padding:18px; margin-bottom:14px;
+  }
+  .card h2{ font-family:'Kanit'; font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+  label{ font-size:12.5px; color:var(--sub); display:block; margin-bottom:5px; }
+  input, select, textarea{
+    width:100%; padding:12px 13px; margin-bottom:10px; border-radius:12px;
+    border:1px solid var(--border); background:#0f172a; color:var(--text); font-size:14px; font-family:'Sarabun';
+  }
+  textarea{ resize:vertical; min-height:70px; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+  .logo-preview{
+    width:100px; height:100px; border-radius:16px; background:#0f172a; border:1px dashed var(--border);
+    display:flex; align-items:center; justify-content:center; margin-bottom:12px; overflow:hidden; color:var(--sub); font-size:12px;
+  }
+  .logo-preview img{ width:100%; height:100%; object-fit:cover; }
+
+  .toggle-row{
+    display:flex; justify-content:space-between; align-items:center; background:#0f172a;
+    border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:10px;
+  }
+  .toggle-row .tlabel{ font-size:13.5px; }
+  .switch{ position:relative; width:44px; height:24px; flex:0 0 auto; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider{ position:absolute; inset:0; background:var(--border); border-radius:24px; cursor:pointer; transition:.2s; }
+  .slider:before{ content:''; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+  input:checked + .slider{ background:var(--accent); }
+  input:checked + .slider:before{ transform:translateX(20px); }
+
+  .chip-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+  .chip-opt{
+    padding:11px; border-radius:12px; border:1px solid var(--border); background:#0f172a;
+    text-align:center; cursor:pointer; font-size:13px; color:var(--sub);
+  }
+  .chip-opt.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  .btn{
+    width:100%; padding:15px; border:none; border-radius:14px; background:var(--accent);
+    color:#fff; font-family:'Kanit'; font-size:16px; font-weight:500; cursor:pointer; margin-top:6px;
+  }
+  .msg{ font-size:13px; margin-top:8px; min-height:16px; text-align:center; }
+  .msg.error{ color:var(--danger); }
+  .msg.ok{ color:var(--ok); }
+
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:20px 14px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังตรวจสอบสิทธิ์...</div></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+const sessionRaw = localStorage.getItem('shopSession');
+let session = null;
+try{ session = JSON.parse(sessionRaw); }catch(e){}
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(session.role !== 'admin' && !(session.permissions && session.permissions.manageSystem)){
+  app.innerHTML = `<div class="blocked"><h1>ไม่มีสิทธิ์ตั้งค่าระบบ</h1><p>บัญชีนี้ไม่ได้รับสิทธิ์ "จัดการระบบ" กรุณาติดต่อแอดมิน</p><br><a href="login.html" style="color:#3b82f6;">กลับหน้าเข้าสู่ระบบ</a></div>`;
+} else {
+  boot();
+}
+
+let shopsCache = {};
+let branchOptions = [];
+let currentBranch = null;
+let settingsCache = {};
+let selectedPaper = '58';
+
+function boot(){
+  db.ref('shops').on('value', snap=>{
+    shopsCache = snap.val() || {};
+    buildBranchOptions();
+    renderShell();
+  });
+}
+
+function buildBranchOptions(){
+  branchOptions = [];
+  Object.keys(shopsCache).forEach(shopId=>{
+    const shop = shopsCache[shopId];
+    const info = shop.info || {};
+    const branches = shop.branches || {};
+    const branchIds = Object.keys(branches);
+    let allowed = branchIds;
+    if(session.role !== 'admin'){
+      const access = session.access || {};
+      if(!access[shopId]) return;
+      allowed = branchIds.filter(bid => access[shopId][bid]);
+    }
+    allowed.forEach(bid=>{
+      branchOptions.push({ shopId, shopName: info.name, branchId: bid, branchName: branches[bid].name });
+    });
+  });
+  if(!currentBranch && branchOptions.length){
+    currentBranch = pickInitialBranch(branchOptions);
+  }
+}
+
+function pickInitialBranch(options){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+  if(saved && options.some(b=>b.shopId===saved.shopId && b.branchId===saved.branchId)){
+    return { shopId: saved.shopId, branchId: saved.branchId };
+  }
+  return { shopId: options[0].shopId, branchId: options[0].branchId };
+}
+
+function renderShell(){
+  const roleLabel = {admin:'ADMIN', owner:'OWNER', staff:'STAFF'}[session.role] || session.role;
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="topbar">
+        <h1>⚙️ ตั้งค่าร้าน</h1>
+        <div class="who">${session.name}<br><span style="color:#93c5fd">${roleLabel}</span></div>
+      </div>
+      <div class="nav-bar" id="navBar"></div>
+      <div class="current-shop-banner" id="currentShopBanner"></div>
+      <div id="mainContent"></div>
+    </div>
+  `;
+  renderNavBar();
+  renderBanner();
+  renderMainContent();
+}
+
+function renderNavBar(){
+  const wrap = document.getElementById('navBar');
+  const items = [
+    { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
+    { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
+    { href:'products.html', icon:'📦', label:'สินค้า', show:true },
+    { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show:true },
+    { href:'pricetag.html', icon:'🏷️', label:'ป้ายราคา', show:true },
+    { href:'sales.html', icon:'🧾', label:'รายการขาย', show:true },
+    { href:'reports.html', icon:'📈', label:'รายงาน', show: session.role==='admin' || (session.permissions&&session.permissions.viewReport) },
+    { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' },
+    { href:'settings.html', icon:'⚙️', label:'ตั้งค่า', show: session.role==='admin' || (session.permissions&&session.permissions.manageSystem) }
+  ];
+  wrap.innerHTML = items.filter(i=>i.show).map(i=>
+    `<a class="nav-item ${i.href==='settings.html'?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
+  ).join('');
+}
+
+function renderBanner(){
+  const banner = document.getElementById('currentShopBanner');
+  if(!banner) return;
+  if(branchOptions.length === 0){
+    banner.style.display = 'flex';
+    banner.innerHTML = `ยังไม่มีร้าน/สาขาที่เข้าถึงได้`;
+    return;
+  }
+  const cur = branchOptions.find(b=>b.shopId===currentBranch.shopId && b.branchId===currentBranch.branchId);
+  if(cur){
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span class="pin">📍</span> กำลังตั้งค่าร้าน: <b>${cur.shopName} · ${cur.branchName}</b><a href="home.html" style="margin-left:auto; color:inherit; text-decoration:underline; font-size:12px;">🔄 เปลี่ยนร้าน</a>`;
+  }
+}
+
+function renderMainContent(){
+  const content = document.getElementById('mainContent');
+  if(!currentBranch){
+    content.innerHTML = `<div class="empty-note">ยังไม่มีร้าน/สาขา — ไปเพิ่มร้านที่ shops.html ก่อน</div>`;
+    return;
+  }
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/settings`;
+  db.ref(basePath).once('value').then(snap=>{
+    settingsCache = snap.val() || {};
+    selectedPaper = settingsCache.paperWidth || '58';
+    renderForm();
+  });
+  content.innerHTML = `<div class="empty-note">กำลังโหลดการตั้งค่า...</div>`;
+}
+
+function renderForm(){
+  const s = settingsCache;
+  const content = document.getElementById('mainContent');
+  content.innerHTML = `
+    <div class="card">
+      <h2>🏪 ข้อมูลร้าน</h2>
+      <label>ชื่อร้าน (แสดงบนใบเสร็จ/ป้ายราคา)</label>
+      <input id="setShopName" value="${s.shopName || ''}" placeholder="ชื่อร้าน">
+      <label>ที่อยู่ร้าน</label>
+      <textarea id="setAddress" placeholder="ที่อยู่ร้าน สำหรับพิมพ์บนใบเสร็จ">${s.address || ''}</textarea>
+      <div class="row2">
+        <div><label>เบอร์โทร</label><input id="setPhone" value="${s.phone || ''}" placeholder="เบอร์โทรร้าน"></div>
+        <div><label>เลขประจำตัวผู้เสียภาษี</label><input id="setTaxId" value="${s.taxId || ''}" placeholder="เลข 13 หลัก"></div>
+      </div>
+      <label>ข้อความท้ายใบเสร็จ</label>
+      <textarea id="setFooter" placeholder="เช่น ขอบคุณที่ใช้บริการ">${s.receiptFooter || ''}</textarea>
+    </div>
+
+    <div class="card">
+      <h2>🖼️ โลโก้ร้าน</h2>
+      <div class="logo-preview" id="logoPreview">${s.logoUrl ? `<img src="${s.logoUrl}">` : 'ไม่มีโลโก้'}</div>
+      <label>ลิงก์รูปโลโก้</label>
+      <input id="setLogo" value="${s.logoUrl || ''}" placeholder="วางลิงก์รูปโลโก้">
+    </div>
+
+    <div class="card">
+      <h2>🧮 ภาษี / VAT</h2>
+      <div class="toggle-row">
+        <span class="tlabel">ออกใบกำกับภาษีเต็มรูป</span>
+        <label class="switch"><input type="checkbox" id="setTaxInvoice" ${s.taxInvoiceEnabled ? 'checked':''}><span class="slider"></span></label>
+      </div>
+      <label>อัตรา VAT เริ่มต้น (%)</label>
+      <input id="setVatRate" type="number" min="0" max="100" value="${s.vatRate ?? 7}">
+    </div>
+
+    <div class="card">
+      <h2>🖨️ เครื่องพิมพ์</h2>
+      <label>ขนาดกระดาษใบเสร็จ</label>
+      <div class="chip-grid" id="paperGrid"></div>
+      <div class="toggle-row">
+        <span class="tlabel">พิมพ์ใบเสร็จอัตโนมัติหลังชำระเงิน</span>
+        <label class="switch"><input type="checkbox" id="setAutoPrint" ${s.autoPrint ? 'checked':''}><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🏷️ บาร์โค้ด</h2>
+      <label>คำนำหน้าบาร์โค้ดที่สร้างอัตโนมัติ</label>
+      <input id="setBarcodePrefix" value="${s.barcodePrefix ?? '2'}" placeholder="ตัวเลข/ตัวอักษรนำหน้า">
+    </div>
+
+    <button class="btn" id="saveSettingsBtn">💾 บันทึกการตั้งค่า</button>
+    <div class="msg" id="settingsMsg"></div>
+  `;
+
+  document.getElementById('setLogo').oninput = (e)=>{
+    const url = e.target.value.trim();
+    document.getElementById('logoPreview').innerHTML = url
+      ? `<img src="${url}" onerror="this.parentElement.innerHTML='ลิงก์รูปใช้ไม่ได้'">`
+      : 'ไม่มีโลโก้';
+  };
+
+  const paperGrid = document.getElementById('paperGrid');
+  const papers = [{v:'58', l:'58 มม.'}, {v:'80', l:'80 มม.'}];
+  paperGrid.innerHTML = papers.map(p=>
+    `<div class="chip-opt ${p.v===selectedPaper?'active':''}" data-p="${p.v}">${p.l}</div>`
+  ).join('');
+  document.querySelectorAll('.chip-opt').forEach(el=>{
+    el.onclick = ()=>{
+      selectedPaper = el.dataset.p;
+      document.querySelectorAll('.chip-opt').forEach(c=>c.classList.remove('active'));
+      el.classList.add('active');
+    };
+  });
+
+  document.getElementById('saveSettingsBtn').onclick = saveSettings;
+}
+
+function saveSettings(){
+  const msg = document.getElementById('settingsMsg');
+  msg.className = 'msg error';
+
+  const settings = {
+    shopName: document.getElementById('setShopName').value.trim(),
+    address: document.getElementById('setAddress').value.trim(),
+    phone: document.getElementById('setPhone').value.trim(),
+    taxId: document.getElementById('setTaxId').value.trim(),
+    receiptFooter: document.getElementById('setFooter').value.trim(),
+    logoUrl: document.getElementById('setLogo').value.trim(),
+    taxInvoiceEnabled: document.getElementById('setTaxInvoice').checked,
+    vatRate: parseFloat(document.getElementById('setVatRate').value) || 0,
+    paperWidth: selectedPaper,
+    autoPrint: document.getElementById('setAutoPrint').checked,
+    barcodePrefix: document.getElementById('setBarcodePrefix').value.trim() || '2',
+    updatedAt: Date.now(),
+    updatedBy: session.name
+  };
+
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/settings`;
+  db.ref(basePath).set(settings).then(()=>{
+    settingsCache = settings;
+    msg.className = 'msg ok';
+    msg.textContent = 'บันทึกการตั้งค่าสำเร็จ';
+  }).catch(err=>{
+    msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  });
+}
+</script>
+</body>
+</html>

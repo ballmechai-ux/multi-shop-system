@@ -306,10 +306,12 @@ function renderNavBar(activePage){
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
     { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
     { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show: true },
+    { href:'pricetag.html', icon:'🏷️', label:'ป้ายราคา', show: true },
     { href:'sales.html', icon:'🧾', label:'รายการขาย', show: true },
     { href:'reports.html', icon:'📈', label:'รายงาน', show: session.role==='admin' || (session.permissions&&session.permissions.viewReport) },
     { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
-    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' },
+    { href:'settings.html', icon:'⚙️', label:'ตั้งค่า', show: session.role==='admin' || (session.permissions&&session.permissions.manageSystem) }
   ];
   wrap.innerHTML = items.filter(i=>i.show).map(i=>
     `<a class="nav-item ${i.href===activePage?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
@@ -455,8 +457,14 @@ function openDetail(id){
     <button class="modal-actions close-btn" style="width:100%; margin-top:10px;" id="closeModalBtn">ปิด</button>
   `;
   document.getElementById('editBtn').onclick = ()=> alert('หน้า "แก้ไขสินค้า" ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
-  document.getElementById('barcodeBtn').onclick = ()=> alert('หน้า "สร้างบาร์โค้ด" ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
-  document.getElementById('tagBtn').onclick = ()=> alert('หน้า "สร้างป้ายราคา" ยังไม่ถูกสร้าง (ขั้นตอนถัดไปของระบบ)');
+  document.getElementById('barcodeBtn').onclick = ()=>{
+    localStorage.setItem('pricetagPreselect', id);
+    location.href = 'pricetag.html';
+  };
+  document.getElementById('tagBtn').onclick = ()=>{
+    localStorage.setItem('pricetagPreselect', id);
+    location.href = 'pricetag.html';
+  };
   document.getElementById('closeModalBtn').onclick = closeModal;
   document.getElementById('modalOverlay').classList.add('show');
 }

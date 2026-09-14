@@ -207,10 +207,12 @@ function renderNavBar(){
     { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: session.role==='admin' || (session.permissions&&session.permissions.sell) },
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
     { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
+    { href:'pricetag.html', icon:'🏷️', label:'ป้ายราคา', show:true },
     { href:'sales.html', icon:'🧾', label:'รายการขาย', show:true },
     { href:'reports.html', icon:'📈', label:'รายงาน', show: session.role==='admin' || (session.permissions&&session.permissions.viewReport) },
     { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
-    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' }
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน', show: session.role==='admin' },
+    { href:'settings.html', icon:'⚙️', label:'ตั้งค่า', show: session.role==='admin' || (session.permissions&&session.permissions.manageSystem) }
   ];
   wrap.innerHTML = items.filter(i=>i.show).map(i=>
     `<a class="nav-item ${i.href==='sales.html'?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`

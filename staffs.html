@@ -148,10 +148,12 @@ function renderNavBar(activePage){
     { href:'products.html', icon:'📦', label:'สินค้า' },
     { href:'stock.html', icon:'📊', label:'สต็อก' },
     { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า' },
+    { href:'pricetag.html', icon:'🏷️', label:'ป้ายราคา' },
     { href:'sales.html', icon:'🧾', label:'รายการขาย' },
     { href:'reports.html', icon:'📈', label:'รายงาน' },
     { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา' },
-    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน' }
+    { href:'staffs.html', icon:'👨‍💼', label:'พนักงาน' },
+    { href:'settings.html', icon:'⚙️', label:'ตั้งค่า' }
   ];
   wrap.innerHTML = items.map(i=>
     `<a class="nav-item ${i.href===activePage?'active':''}" href="${i.href}">${i.icon} ${i.label}</a>`
