@@ -26,6 +26,10 @@
   .back-link{ color:var(--accent); font-size:13px; cursor:pointer; }
 
   .nav-bar{ display:flex; gap:6px; overflow-x:auto; margin-bottom:12px; padding-bottom:4px; }
+
+  @media (min-width:700px){
+    .nav-bar{ flex-wrap:wrap; overflow-x:visible; }
+  }
   .nav-bar::-webkit-scrollbar{ display:none; }
   .nav-item{
     flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:12px;
