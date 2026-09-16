@@ -90,6 +90,12 @@
   .product-card .pname{ font-family:'Kanit'; font-size:13.5px; margin-bottom:4px; }
   .product-card .pmeta{ font-size:11.5px; color:var(--sub); }
   .product-card .pprice{ font-family:'Kanit'; color:#93c5fd; font-size:15px; margin-top:6px; }
+  .product-card .pprice .porig{ text-decoration:line-through; color:var(--sub); font-size:12px; margin-right:5px; }
+  .product-card .pprice .pdisc{ color:#f87171; }
+  .promo-flag{
+    font-size:9.5px; padding:1px 7px; border-radius:20px; background:#ef444433; color:#f87171;
+    font-family:'Kanit'; display:inline-block; margin-top:3px;
+  }
   .product-card .pstock{ font-size:10.5px; margin-top:2px; }
   .pstock.low{ color:#fbbf24; }
   .pstock.out{ color:var(--danger); }
@@ -350,6 +356,16 @@ function updateViewToggleBtn(){
   btn.style.background = isRow ? '#2563eb22' : 'var(--card)';
 }
 let productsCache = {};
+let promosCache = {};
+
+function getPromoPrice(p, productId){
+  const promoId = Object.keys(promosCache).find(id =>
+    promosCache[id].productId === productId && promosCache[id].active !== false
+  );
+  if(!promoId) return null;
+  const promo = promosCache[promoId];
+  return (p.sellPrice||0) * (1 - promo.discountPercent/100);
+}
 let cart = {}; // cartKey -> {productId, name, price, qty, discount, unit}
 
 function boot(){
@@ -422,6 +438,7 @@ function renderNavBar(activePage){
     { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
     { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show: true },
     { href:'pricetag.html', icon:'🏷️', label:'ป้ายราคา', show: true },
+    { href:'promotions.html', icon:'🔥', label:'โปรโมชั่น', show: true },
     { href:'sales.html', icon:'🧾', label:'รายการขาย', show: true },
     { href:'reports.html', icon:'📈', label:'รายงาน', show: session.role==='admin' || (session.permissions&&session.permissions.viewReport) },
     { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
@@ -511,10 +528,14 @@ function renderMainContent(){
     renderProductGrid();
   };
 
-  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/products`;
-  db.ref(basePath).on('value', snap=>{
+  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+  db.ref(basePath + '/products').on('value', snap=>{
     productsCache = snap.val() || {};
     renderCategorySidebar();
+    renderProductGrid();
+  });
+  db.ref(basePath + '/promotions').on('value', snap=>{
+    promosCache = snap.val() || {};
     renderProductGrid();
   });
 
@@ -573,14 +594,19 @@ function renderProductGrid(){
     const imgHtml = !showProductImages ? '<div class="pimg-blank"></div>' : (p.image
       ? `<img class="pimg" src="${p.image}" onerror="this.outerHTML='<div class=&quot;pimg-fallback&quot;>🥤</div>'">`
       : `<div class="pimg-fallback">🥤</div>`);
+    const promoPrice = getPromoPrice(p, id);
+    const priceHtml = promoPrice !== null
+      ? `<span class="porig">฿${(p.sellPrice||0).toLocaleString()}</span><span class="pdisc">฿${promoPrice.toLocaleString(undefined,{maximumFractionDigits:2})}</span>`
+      : `฿${(p.sellPrice||0).toLocaleString()}`;
     return `<div class="product-card" data-id="${id}">
       ${imgHtml}
       <div class="pinfo">
         <div class="pname">${p.name||'(ไม่มีชื่อ)'}</div>
         <div class="pmeta">${p.category||'ไม่ระบุหมวด'}</div>
         <div class="pstock ${stockClass}">${stockLabel}</div>
+        ${promoPrice !== null ? '<span class="promo-flag">🔥 โปรโมชั่น</span>' : ''}
       </div>
-      <div class="pprice">฿${(p.sellPrice||0).toLocaleString()}</div>
+      <div class="pprice">${priceHtml}</div>
     </div>`;
   }).join('');
 
@@ -593,11 +619,12 @@ function addToCart(productId){
   const p = productsCache[productId];
   if(!p) return;
   if((p.stock||0) <= 0){ alert('สินค้านี้หมดสต็อกแล้ว'); return; }
+  const basePrice = getPromoPrice(p, productId) ?? (p.sellPrice||0);
   const groups = getEffectiveGroups(p);
   if(groups.length > 0){
-    openOptionsModal(productId, groups);
+    openOptionsModal(productId, groups, basePrice);
   } else {
-    addResolvedToCart(productId, productId, p.name, p.sellPrice||0);
+    addResolvedToCart(productId, productId, p.name, basePrice);
   }
 }
 
@@ -628,8 +655,9 @@ function addResolvedToCart(productId, cartKey, name, price){
   toggleCart(true);
 }
 
-function openOptionsModal(productId, groups){
+function openOptionsModal(productId, groups, basePrice){
   const p = productsCache[productId];
+  if(basePrice === undefined) basePrice = p.sellPrice||0;
   let overlay = document.getElementById('optModalOverlay');
   if(!overlay){
     overlay = document.createElement('div');
@@ -654,7 +682,7 @@ function openOptionsModal(productId, groups){
     <div class="modal-sheet">
       <h2>${p.name}</h2>
       ${groupsHtml}
-      <div class="opt-total">ราคา: <span id="optPriceVal">฿${(p.sellPrice||0).toLocaleString()}</span></div>
+      <div class="opt-total">ราคา: <span id="optPriceVal">฿${basePrice.toLocaleString(undefined,{maximumFractionDigits:2})}</span></div>
       <button class="btn" id="optConfirmBtn" style="margin-top:10px">เพิ่มลงตะกร้า</button>
       <button class="btn outline" id="optCancelBtn">ยกเลิก</button>
     </div>
@@ -662,7 +690,7 @@ function openOptionsModal(productId, groups){
   overlay.classList.add('show');
 
   const recalc = ()=>{
-    let price = p.sellPrice||0;
+    let price = basePrice;
     let labelParts = [];
     groups.forEach((g,gi)=>{
       const inputName = `grp${gi}`;
@@ -681,7 +709,7 @@ function openOptionsModal(productId, groups){
         });
       }
     });
-    document.getElementById('optPriceVal').textContent = '฿' + price.toLocaleString();
+    document.getElementById('optPriceVal').textContent = '฿' + price.toLocaleString(undefined,{maximumFractionDigits:2});
     return { price, labelParts };
   };
 
