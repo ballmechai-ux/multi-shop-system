@@ -226,6 +226,14 @@ let currentBranch = null;
 let productsCache = {};
 let selectedProductId = null;
 let shopSettings = {};
+let promosCache = {};
+
+function getActivePromo(productId){
+  const promoId = Object.keys(promosCache).find(id =>
+    promosCache[id].productId === productId && promosCache[id].active !== false
+  );
+  return promoId ? promosCache[promoId] : null;
+}
 
 function boot(){
   db.ref('shops').on('value', snap=>{
@@ -293,6 +301,7 @@ function renderNavBar(){
     { href:'stock.html', icon:'📊', label:'สต็อก', show:true },
     { href:'receive.html', icon:'📥', label:'รับสินค้าเข้า', show:true },
     { href:'pricetag.html', icon:'🏷️', label:'ป้ายราคา', show:true },
+    { href:'promotions.html', icon:'🔥', label:'โปรโมชั่น', show:true },
     { href:'sales.html', icon:'🧾', label:'รายการขาย', show:true },
     { href:'reports.html', icon:'📈', label:'รายงาน', show: session.role==='admin' || (session.permissions&&session.permissions.viewReport) },
     { href:'shops.html', icon:'🏪', label:'ร้าน/สาขา', show: session.role==='admin' },
@@ -346,6 +355,10 @@ function renderMainContent(){
 
   const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
   db.ref(basePath + '/settings').once('value').then(snap=>{ shopSettings = snap.val() || {}; });
+  db.ref(basePath + '/promotions').on('value', snap=>{
+    promosCache = snap.val() || {};
+    renderTagArea();
+  });
   db.ref(basePath + '/products').on('value', snap=>{
     productsCache = snap.val() || {};
     if(selectedProductId && !productsCache[selectedProductId]) selectedProductId = null;
@@ -395,6 +408,8 @@ function renderTagArea(){
   }
   const p = productsCache[selectedProductId];
   const shopName = shopSettings.shopName || (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
+  const activePromo = getActivePromo(selectedProductId);
+  const promoPrice = activePromo ? (p.sellPrice||0) * (1 - activePromo.discountPercent/100) : null;
 
   area.innerHTML = `
     <div class="card">
@@ -407,8 +422,9 @@ function renderTagArea(){
       <button class="btn outline" id="printBarcodeBtn">🖨️ พิมพ์บาร์โค้ด</button>
 
       <h2 style="margin-top:18px">ป้ายราคา</h2>
+      ${activePromo ? `<div class="msg ok" style="margin-top:0">🔥 สินค้านี้มีโปรโมชั่นลด ${activePromo.discountPercent}% อยู่ — ใส่ราคาให้อัตโนมัติแล้ว (แก้ไขเองได้ถ้าต้องการ)</div>` : ''}
       <label>ราคาที่จะแสดงบนป้าย (ปล่อยว่าง = ใช้ราคาขายปกติ)</label>
-      <input type="number" id="tagDiscountPrice" placeholder="เช่น ราคาโปรโมชั่น">
+      <input type="number" id="tagDiscountPrice" value="${promoPrice !== null ? promoPrice.toFixed(2) : ''}" placeholder="เช่น ราคาโปรโมชั่น">
       <label>จำนวนป้ายที่จะพิมพ์</label>
       <input type="number" id="tagQty" min="1" value="1">
       <div class="tag-preview" id="tagPreview"></div>
