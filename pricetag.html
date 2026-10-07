@@ -229,6 +229,7 @@ let branchOptions = [];
 let currentBranch = null;
 let productsCache = {};
 let tagQueue = [];
+let previewIdx = 0;
 let shopSettings = {};
 let promosCache = {};
 
@@ -418,7 +419,7 @@ const TAG_CSS = `
 .pt .bc{max-width:100%;height:auto;margin-top:3px}
 .pt .nobc{font-size:9px;color:#999;margin-top:4px}
 .pt svg{max-width:100%;height:auto}
-.pt.land{width:95mm;max-width:100%;min-height:42mm;display:flex;flex-direction:column;justify-content:space-between;gap:2mm;text-align:left}
+.pt.land{width:95mm;max-width:100%;display:flex;flex-direction:column;justify-content:space-between;gap:2mm;text-align:left}
 .pt.land .ltop{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm}
 .pt.land .lname{flex:1;min-width:0}
 .pt.land .lprice{flex:none;text-align:right}
@@ -434,6 +435,15 @@ const TAG_CSS = `
 .qhead{display:flex;justify-content:space-between;margin-bottom:8px;font-family:'Kanit'}
 .qdel{color:var(--danger);cursor:pointer;padding:0 6px}
 .qwarn{color:#fbbf24;font-size:12px;margin-bottom:8px}
+.qrow.sel{border-color:var(--accent)}
+.qcap{font-size:11px;color:var(--sub);margin-bottom:6px}
+.qline{display:flex;gap:6px;align-items:center}
+.qn{flex:1;min-width:0;font-family:'Kanit';font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qline input{width:58px;margin:0;padding:8px}
+.qline select{width:auto;margin:0;padding:8px 6px;font-size:13px}
+.qtog{color:var(--sub);cursor:pointer;padding:6px 4px}
+.qmore{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.pvcap{font-size:12px;color:#334155;margin-bottom:8px}
 #tagPreview{background:#e2e8f0;border-radius:12px;padding:10px;margin-bottom:12px;max-height:420px;overflow:auto}
 `; document.head.appendChild(st); })();
 
@@ -449,6 +459,7 @@ function addToQueue(pid, silent){
     tagQueue.push({ pid, qty:1, mode: promo?'promo':'normal',
       price: promo ? ((p.sellPrice||0)*(1-promo.discountPercent/100)).toFixed(2) : '', from:'', until:'', prodExp:'' });
   }
+  previewIdx = Math.max(0, tagQueue.findIndex(r=>r.pid===pid));
   if(!silent){ document.getElementById('searchBox').value=''; document.getElementById('searchResults').innerHTML=''; }
   renderTagArea();
 }
@@ -515,34 +526,48 @@ function renderTagArea(){
 
 function renderQueue(){
   const wrap = document.getElementById('queueList');
-  wrap.innerHTML = tagQueue.map((r,i)=>{
+  wrap.innerHTML = `<div class="qcap">สินค้า · จำนวนป้าย · ประเภท (กด ▼ เพื่อตั้งราคา/วันที่)</div>` + tagQueue.map((r,i)=>{
     const p = productsCache[r.pid];
-    return `<div class="qrow">
-      <div class="qhead"><b>${esc(p.name)}</b><span class="qdel" data-del="${i}">✕ เอาออก</span></div>
-      ${p.barcode?'':`<div class="qwarn">⚠️ สินค้านี้ยังไม่มีบาร์โค้ด — กดปุ่ม "สร้างบาร์โค้ด" ด้านล่างก่อนพิมพ์</div>`}
-      <div class="row2">
-        <div><label>จำนวนป้าย</label><input type="number" min="1" value="${r.qty}" data-i="${i}" data-f="qty"></div>
-        <div><label>ประเภทป้าย</label><select data-i="${i}" data-f="mode">
+    return `<div class="qrow ${i===previewIdx?'sel':''}" data-row="${i}">
+      <div class="qline">
+        <div class="qn">${esc(p.name)}${p.barcode?'':' ⚠️'}</div>
+        <input type="number" min="1" value="${r.qty}" data-i="${i}" data-f="qty">
+        <select data-i="${i}" data-f="mode">
           <option value="normal" ${r.mode==='normal'?'selected':''}>ปกติ</option>
-          <option value="promo" ${r.mode==='promo'?'selected':''}>โปรโมชั่น</option>
-          <option value="clear" ${r.mode==='clear'?'selected':''}>เคลียร์ใกล้หมดอายุ</option></select></div>
+          <option value="promo" ${r.mode==='promo'?'selected':''}>โปร</option>
+          <option value="clear" ${r.mode==='clear'?'selected':''}>เคลียร์</option></select>
+        <span class="qtog" data-tog="${i}">${r.open?'▲':'▼'}</span>
+        <span class="qdel" data-del="${i}">✕</span>
       </div>
-      <label>ราคาบนป้าย (ว่าง = ราคาปกติ ฿${(p.sellPrice||0).toLocaleString()})</label>
-      <input type="number" value="${esc(r.price)}" data-i="${i}" data-f="price" placeholder="เช่น ราคาโปรโมชั่น">
-      ${r.mode!=='normal'?`<div class="row2">
-        <div><label>เริ่มวัน-เวลา</label><input type="datetime-local" value="${esc(r.from)}" data-i="${i}" data-f="from"></div>
-        <div><label>ป้ายหมดอายุวัน-เวลา</label><input type="datetime-local" value="${esc(r.until)}" data-i="${i}" data-f="until"></div></div>`:''}
-      ${r.mode==='clear'?`<label>วันหมดอายุของสินค้า</label><input type="date" value="${esc(r.prodExp)}" data-i="${i}" data-f="prodExp">`:''}
+      ${r.open?`<div class="qmore">
+        ${p.barcode?'':`<div class="qwarn">⚠️ ยังไม่มีบาร์โค้ด — กด "สร้างบาร์โค้ด" ด้านล่างก่อนพิมพ์</div>`}
+        <label>ราคาบนป้าย (ว่าง = ราคาปกติ ฿${(p.sellPrice||0).toLocaleString()})</label>
+        <input type="number" value="${esc(r.price)}" data-i="${i}" data-f="price" placeholder="เช่น ราคาโปรโมชั่น" style="width:100%">
+        ${r.mode!=='normal'?`<div class="row2">
+          <div><label>เริ่มวัน-เวลา</label><input type="datetime-local" value="${esc(r.from)}" data-i="${i}" data-f="from" style="width:100%"></div>
+          <div><label>ป้ายหมดอายุ</label><input type="datetime-local" value="${esc(r.until)}" data-i="${i}" data-f="until" style="width:100%"></div></div>`:''}
+        ${r.mode==='clear'?`<label>วันหมดอายุของสินค้า</label><input type="date" value="${esc(r.prodExp)}" data-i="${i}" data-f="prodExp" style="width:100%">`:''}
+      </div>`:''}
     </div>`;
   }).join('');
-  wrap.oninput = e=>{ const t=e.target; if(t.dataset.f && t.tagName!=='SELECT'){ tagQueue[t.dataset.i][t.dataset.f]=t.value; renderPreview(); } };
-  wrap.onchange = e=>{ const t=e.target; if(t.tagName==='SELECT'){ tagQueue[t.dataset.i].mode=t.value; renderQueue(); renderPreview(); } };
-  wrap.onclick = e=>{ const d=e.target.dataset.del; if(d!==undefined){ tagQueue.splice(parseInt(d),1); renderTagArea(); } };
+  const setPv = i=>{ if(i===previewIdx) return; previewIdx=i; wrap.querySelectorAll('.qrow').forEach((el,k)=>el.classList.toggle('sel',k===i)); renderPreview(); };
+  wrap.onfocusin = e=>{ const row=e.target.closest('.qrow'); if(row) setPv(parseInt(row.dataset.row)); };
+  wrap.oninput = e=>{ const t=e.target; if(t.dataset.f && t.tagName!=='SELECT'){ tagQueue[t.dataset.i][t.dataset.f]=t.value; previewIdx=parseInt(t.dataset.i); renderPreview(); } };
+  wrap.onchange = e=>{ const t=e.target; if(t.tagName==='SELECT'){ const r=tagQueue[t.dataset.i]; r.mode=t.value; if(r.mode!=='normal') r.open=true; previewIdx=parseInt(t.dataset.i); renderQueue(); renderPreview(); } };
+  wrap.onclick = e=>{
+    const d=e.target.dataset.del, g=e.target.dataset.tog;
+    if(d!==undefined){ tagQueue.splice(parseInt(d),1); previewIdx=0; renderTagArea(); }
+    else if(g!==undefined){ const r=tagQueue[parseInt(g)]; r.open=!r.open; previewIdx=parseInt(g); renderQueue(); renderPreview(); }
+  };
 }
 function renderPreview(){
   const layout = document.getElementById('tagLayout').value;
   const pv = document.getElementById('tagPreview');
-  pv.innerHTML = `<div class="grid">${tagQueue.map(r=>tagHTML(r,layout)).join('')}</div>`;
+  if(!tagQueue.length){ pv.innerHTML=''; return; }
+  const idx = Math.min(previewIdx, tagQueue.length-1);
+  const r = tagQueue[idx];
+  const total = tagQueue.reduce((a,x)=>a+Math.max(1,parseInt(x.qty)||1),0);
+  pv.innerHTML = `<div class="pvcap">ตัวอย่าง: ${esc(productsCache[r.pid].name)} · พิมพ์ทั้งหมด ${total} ป้าย (${tagQueue.length} สินค้า)</div><div class="grid">${tagHTML(r,layout)}</div>`;
   renderSvgs(pv);
 }
 
