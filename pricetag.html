@@ -404,7 +404,7 @@ function renderSearchResults(){
 
 const TAG_CSS = `
 .grid{display:flex;flex-wrap:wrap;gap:3mm}
-.pt{width:55mm;min-height:42mm;padding:2.5mm;border:1px dashed #888;text-align:center;background:#fff;color:#000;
+.pt{width:55mm;max-width:100%;min-height:42mm;padding:2.5mm;border:1px dashed #888;text-align:center;background:#fff;color:#000;
   box-sizing:border-box;page-break-inside:avoid;break-inside:avoid;font-family:'Sarabun',sans-serif;
   -webkit-print-color-adjust:exact;print-color-adjust:exact}
 .pt .banner{background:#dc2626;color:#fff;font-family:'Kanit',sans-serif;font-size:11px;padding:1px 4px;margin:-2.5mm -2.5mm 2mm;}
@@ -417,11 +417,15 @@ const TAG_CSS = `
 .pt .dates{font-size:9px;color:#333;line-height:1.35;margin-top:2px}
 .pt .bc{max-width:100%;height:auto;margin-top:3px}
 .pt .nobc{font-size:9px;color:#999;margin-top:4px}
-.pt.land{width:95mm;height:45mm;display:grid;grid-template-columns:1fr 40mm;gap:3mm;text-align:left;align-items:center}
-.pt.land .banner{grid-column:1 / -1;margin-bottom:0}
-.pt.land .prow{justify-content:flex-start}
-.pt.land .price{font-size:32px}
-.pt.land .right{text-align:center}
+.pt svg{max-width:100%;height:auto}
+.pt.land{width:95mm;max-width:100%;min-height:42mm;display:flex;flex-direction:column;justify-content:space-between;gap:2mm;text-align:left}
+.pt.land .ltop{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm}
+.pt.land .lname{flex:1;min-width:0}
+.pt.land .lprice{flex:none;text-align:right}
+.pt.land .prow{justify-content:flex-end}
+.pt.land .price{font-size:30px}
+.pt.land .lbc{text-align:center}
+.pt.land .lbc .bc{margin-top:0}
 .bcstrip{width:60mm;padding:3mm;border:1px dashed #888;text-align:center;box-sizing:border-box;page-break-inside:avoid;break-inside:avoid}
 .bcstrip img{max-width:100%}
 `;
@@ -470,10 +474,10 @@ function tagHTML(r, layout){
     if(r.mode==='clear' && r.prodExp) dates += `สินค้าหมดอายุ ${fmtD(r.prodExp)}`;
   }
   const bc = p.barcode ? `<svg class="bcsvg" data-code="${esc(p.barcode)}" data-h="${layout==='landscape'?40:30}"></svg>` : `<div class="nobc">ยังไม่มีบาร์โค้ด</div>`;
-  const main = `<div class="shop">${esc(shopName)}</div><div class="name">${esc(p.name)}</div>
-    <div class="prow">${pr.disc?`<span class="orig">฿${pr.orig.toLocaleString()}</span>`:''}<span class="price">฿${pr.price.toLocaleString()}</span></div>
-    ${dates?`<div class="dates">${dates}</div>`:''}`;
-  if(layout==='landscape') return `<div class="pt land">${banner}<div>${main}</div><div class="right">${bc}</div></div>`;
+  const prow = `<div class="prow">${pr.disc?`<span class="orig">฿${pr.orig.toLocaleString()}</span>`:''}<span class="price">฿${pr.price.toLocaleString()}</span></div>`;
+  const dl = dates?`<div class="dates">${dates}</div>`:'';
+  const main = `<div class="shop">${esc(shopName)}</div><div class="name">${esc(p.name)}</div>${prow}${dl}`;
+  if(layout==='landscape') return `<div class="pt land">${banner}<div class="ltop"><div class="lname"><div class="shop">${esc(shopName)}</div><div class="name">${esc(p.name)}</div>${dl}</div><div class="lprice">${prow}</div></div><div class="lbc">${bc}</div></div>`;
   return `<div class="pt">${banner}${main}${bc}</div>`;
 }
 function allTagsHTML(){
