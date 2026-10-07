@@ -228,7 +228,7 @@ let shopsCache = {};
 let branchOptions = [];
 let currentBranch = null;
 let productsCache = {};
-let selectedProductId = null;
+let tagQueue = [];
 let shopSettings = {};
 let promosCache = {};
 
@@ -340,7 +340,7 @@ function renderMainContent(){
   }
   content.innerHTML = `
     <div class="card">
-      <h2>เลือกสินค้า</h2>
+      <h2>เลือกสินค้า (เพิ่มได้หลายรายการ)</h2>
       <div class="search-row">
         <input type="text" id="searchBox" placeholder="🔍 ค้นหาชื่อสินค้า หรือรหัส/บาร์โค้ด">
         <div class="scan-btn" id="scanBtn">📷</div>
@@ -365,13 +365,11 @@ function renderMainContent(){
   });
   db.ref(basePath + '/products').on('value', snap=>{
     productsCache = snap.val() || {};
-    if(selectedProductId && !productsCache[selectedProductId]) selectedProductId = null;
-    if(!selectedProductId){
-      const preselect = localStorage.getItem('pricetagPreselect');
-      if(preselect && productsCache[preselect]){
-        selectedProductId = preselect;
-        localStorage.removeItem('pricetagPreselect');
-      }
+    tagQueue = tagQueue.filter(r => productsCache[r.pid]);
+    const preselect = localStorage.getItem('pricetagPreselect');
+    if(preselect && productsCache[preselect]){
+      localStorage.removeItem('pricetagPreselect');
+      if(!tagQueue.some(r=>r.pid===preselect)) addToQueue(preselect, true);
     }
     renderSearchResults();
     renderTagArea();
@@ -396,7 +394,7 @@ function renderSearchResults(){
   }).join('');
   document.querySelectorAll('.search-item').forEach(el=>{
     el.onclick = ()=>{
-      selectedProductId = el.dataset.id;
+      addToQueue(el.dataset.id);
       document.getElementById('searchBox').value = '';
       wrap.innerHTML = '';
       renderTagArea();
@@ -404,145 +402,175 @@ function renderSearchResults(){
   });
 }
 
-function renderTagArea(){
-  const area = document.getElementById('tagArea');
-  if(!selectedProductId || !productsCache[selectedProductId]){
-    area.innerHTML = `<div class="empty-note">ค้นหาแล้วเลือกสินค้าด้านบน เพื่อสร้างบาร์โค้ด/ป้ายราคา</div>`;
-    return;
+const TAG_CSS = `
+.grid{display:flex;flex-wrap:wrap;gap:3mm}
+.pt{width:55mm;min-height:42mm;padding:2.5mm;border:1px dashed #888;text-align:center;background:#fff;color:#000;
+  box-sizing:border-box;page-break-inside:avoid;break-inside:avoid;font-family:'Sarabun',sans-serif;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pt .banner{background:#dc2626;color:#fff;font-family:'Kanit',sans-serif;font-size:11px;padding:1px 4px;margin:-2.5mm -2.5mm 2mm;}
+.pt .banner.promo{background:#ea580c}
+.pt .shop{font-size:9px;color:#555}
+.pt .name{font-family:'Kanit',sans-serif;font-size:13px;line-height:1.2;margin:2px 0}
+.pt .prow{display:flex;align-items:baseline;justify-content:center;gap:6px}
+.pt .orig{text-decoration:line-through;color:#888;font-size:12px}
+.pt .price{font-family:'Kanit',sans-serif;font-size:26px;font-weight:700;line-height:1.1}
+.pt .dates{font-size:9px;color:#333;line-height:1.35;margin-top:2px}
+.pt .bc{max-width:100%;height:auto;margin-top:3px}
+.pt .nobc{font-size:9px;color:#999;margin-top:4px}
+.pt.land{width:95mm;height:45mm;display:grid;grid-template-columns:1fr 40mm;gap:3mm;text-align:left;align-items:center}
+.pt.land .banner{grid-column:1 / -1;margin-bottom:0}
+.pt.land .prow{justify-content:flex-start}
+.pt.land .price{font-size:32px}
+.pt.land .right{text-align:center}
+.bcstrip{width:60mm;padding:3mm;border:1px dashed #888;text-align:center;box-sizing:border-box;page-break-inside:avoid;break-inside:avoid}
+.bcstrip img{max-width:100%}
+`;
+(function(){ const st=document.createElement('style'); st.textContent=TAG_CSS+`
+.qrow{background:#0f172a;border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:10px}
+.qhead{display:flex;justify-content:space-between;margin-bottom:8px;font-family:'Kanit'}
+.qdel{color:var(--danger);cursor:pointer;padding:0 6px}
+.qwarn{color:#fbbf24;font-size:12px;margin-bottom:8px}
+#tagPreview{background:#e2e8f0;border-radius:12px;padding:10px;margin-bottom:12px;max-height:420px;overflow:auto}
+`; document.head.appendChild(st); })();
+
+function esc(t){ return String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtDT(v){ if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleString('th-TH',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+function fmtD(v){ if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'2-digit'}); }
+
+function addToQueue(pid, silent){
+  if(tagQueue.some(r=>r.pid===pid)){ const r=tagQueue.find(r=>r.pid===pid); r.qty++; }
+  else {
+    const promo = getActivePromo(pid);
+    const p = productsCache[pid];
+    tagQueue.push({ pid, qty:1, mode: promo?'promo':'normal',
+      price: promo ? ((p.sellPrice||0)*(1-promo.discountPercent/100)).toFixed(2) : '', from:'', until:'', prodExp:'' });
   }
-  const p = productsCache[selectedProductId];
-  const shopName = shopSettings.shopName || (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
-  const activePromo = getActivePromo(selectedProductId);
-  const promoPrice = activePromo ? (p.sellPrice||0) * (1 - activePromo.discountPercent/100) : null;
-
-  area.innerHTML = `
-    <div class="card">
-      <div class="selected-name">${p.name}</div>
-      <div class="selected-meta">฿${(p.sellPrice||0).toLocaleString()} · บาร์โค้ด: ${p.barcode || 'ยังไม่มี'} <span class="change-btn" id="changeProductBtn">(เปลี่ยนสินค้า)</span></div>
-
-      <h2>บาร์โค้ด</h2>
-      <div class="barcode-preview" id="barcodePreview"></div>
-      ${!p.barcode ? `<button class="btn outline" id="genBarcodeBtn">🔄 สร้างบาร์โค้ดใหม่ให้สินค้านี้</button>` : ''}
-      <button class="btn outline" id="printBarcodeBtn">🖨️ พิมพ์บาร์โค้ด</button>
-
-      <h2 style="margin-top:18px">ป้ายราคา</h2>
-      ${activePromo ? `<div class="msg ok" style="margin-top:0">🔥 สินค้านี้มีโปรโมชั่นลด ${activePromo.discountPercent}% อยู่ — ใส่ราคาให้อัตโนมัติแล้ว (แก้ไขเองได้ถ้าต้องการ)</div>` : ''}
-      <label>ราคาที่จะแสดงบนป้าย (ปล่อยว่าง = ใช้ราคาขายปกติ)</label>
-      <input type="number" id="tagDiscountPrice" value="${promoPrice !== null ? promoPrice.toFixed(2) : ''}" placeholder="เช่น ราคาโปรโมชั่น">
-      <label>จำนวนป้ายที่จะพิมพ์</label>
-      <input type="number" id="tagQty" min="1" value="1">
-      <div class="tag-preview" id="tagPreview"></div>
-      <button class="btn" id="printTagBtn">🖨️ พิมพ์ป้ายราคา</button>
-      <div class="msg" id="tagMsg"></div>
-    </div>
-  `;
-
-  document.getElementById('changeProductBtn').onclick = ()=>{ selectedProductId = null; renderTagArea(); };
-  document.getElementById('tagDiscountPrice').oninput = renderTagPreview;
-  document.getElementById('tagQty').oninput = ()=>{};
-
-  const genBtn = document.getElementById('genBarcodeBtn');
-  if(genBtn) genBtn.onclick = generateBarcode;
-
-  document.getElementById('printBarcodeBtn').onclick = printBarcodeStrip;
-  document.getElementById('printTagBtn').onclick = printPriceTags;
-
-  renderBarcodePreview();
-  renderTagPreview();
+  if(!silent){ document.getElementById('searchBox').value=''; document.getElementById('searchResults').innerHTML=''; }
+  renderTagArea();
 }
 
-function renderBarcodePreview(){
-  const p = productsCache[selectedProductId];
-  const wrap = document.getElementById('barcodePreview');
-  if(!p.barcode){
-    wrap.innerHTML = `<div class="no-barcode-note" style="color:#0f172a">สินค้านี้ยังไม่มีบาร์โค้ด — กด "สร้างบาร์โค้ดใหม่" ด้านล่าง</div>`;
-    return;
-  }
-  wrap.innerHTML = `<svg id="barcodeSvg"></svg>`;
-  try{
-    JsBarcode("#barcodeSvg", p.barcode, { format:"CODE128", displayValue:true, fontSize:14, height:50, margin:6 });
-  }catch(e){
-    wrap.innerHTML = `<div class="no-barcode-note" style="color:#0f172a">สร้างบาร์โค้ดจากค่านี้ไม่ได้: ${p.barcode}</div>`;
-  }
+function rowPrice(r){
+  const p = productsCache[r.pid]; const orig = p.sellPrice||0; const v = parseFloat(r.price)||0;
+  return { orig, price: (v>0 && v<orig) ? v : orig, disc: v>0 && v<orig };
 }
-
-function generateBarcode(){
-  // Generate a simple unique numeric code as a barcode value
-  const code = '2' + Date.now().toString().slice(-11);
-  const basePath = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/products/${selectedProductId}`;
-  db.ref(basePath + '/barcode').set(code).then(()=>{
-    productsCache[selectedProductId].barcode = code;
-    renderTagArea();
+function renderSvgs(root){
+  root.querySelectorAll('svg.bcsvg').forEach(el=>{
+    try{ JsBarcode(el, el.dataset.code, { format:"CODE128", displayValue:true, fontSize:parseInt(el.dataset.fs)||10, height:parseInt(el.dataset.h)||30, margin:parseInt(el.dataset.m)||2, width:parseFloat(el.dataset.w)||1.4 }); }catch(e){}
   });
 }
-
-function renderTagPreview(){
-  const p = productsCache[selectedProductId];
-  const shopName = shopSettings.shopName || (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
-  const discountVal = parseFloat(document.getElementById('tagDiscountPrice').value) || 0;
-  const origPrice = p.sellPrice || 0;
-  const showDiscount = discountVal > 0 && discountVal < origPrice;
-  const wrap = document.getElementById('tagPreview');
-  wrap.innerHTML = `
-    <div class="tshop">${shopName}</div>
-    <div class="tname">${p.name}</div>
-    <div class="tprice-row">
-      ${showDiscount ? `<span class="torig">฿${origPrice.toLocaleString()}</span>` : ''}
-      <span class="tprice">฿${(showDiscount ? discountVal : origPrice).toLocaleString()}</span>
-    </div>
-    ${p.barcode ? `<svg id="tagBarcodeSvg"></svg>` : ''}
-  `;
-  if(p.barcode){
-    try{ JsBarcode("#tagBarcodeSvg", p.barcode, { format:"CODE128", displayValue:true, fontSize:10, height:30, margin:2, width:1.4 }); }catch(e){}
+function tagHTML(r, layout){
+  const p = productsCache[r.pid];
+  const shopName = shopSettings.shopName || (shopsCache[currentBranch.shopId]||{}).info?.name || 'ร้านค้า';
+  const pr = rowPrice(r);
+  const banner = r.mode==='clear' ? `<div class="banner">เคลียร์สินค้า · ใกล้หมดอายุ</div>` : r.mode==='promo' ? `<div class="banner promo">โปรโมชั่น</div>` : '';
+  let dates = '';
+  if(r.mode!=='normal'){
+    if(r.from) dates += `เริ่ม ${fmtDT(r.from)}<br>`;
+    if(r.until) dates += `ป้ายหมดอายุ ${fmtDT(r.until)}<br>`;
+    if(r.mode==='clear' && r.prodExp) dates += `สินค้าหมดอายุ ${fmtD(r.prodExp)}`;
   }
+  const bc = p.barcode ? `<svg class="bcsvg" data-code="${esc(p.barcode)}" data-h="${layout==='landscape'?40:30}"></svg>` : `<div class="nobc">ยังไม่มีบาร์โค้ด</div>`;
+  const main = `<div class="shop">${esc(shopName)}</div><div class="name">${esc(p.name)}</div>
+    <div class="prow">${pr.disc?`<span class="orig">฿${pr.orig.toLocaleString()}</span>`:''}<span class="price">฿${pr.price.toLocaleString()}</span></div>
+    ${dates?`<div class="dates">${dates}</div>`:''}`;
+  if(layout==='landscape') return `<div class="pt land">${banner}<div>${main}</div><div class="right">${bc}</div></div>`;
+  return `<div class="pt">${banner}${main}${bc}</div>`;
+}
+function allTagsHTML(){
+  const layout = document.getElementById('tagLayout').value;
+  let out=''; tagQueue.forEach(r=>{ const n=Math.max(1,parseInt(r.qty)||1); const h=tagHTML(r,layout); for(let k=0;k<n;k++) out+=h; });
+  return out;
 }
 
-function printBarcodeStrip(){
-  const p = productsCache[selectedProductId];
-  if(!p.barcode){ alert('สินค้านี้ยังไม่มีบาร์โค้ด กรุณาสร้างบาร์โค้ดก่อน'); return; }
-  const qty = Math.max(1, parseInt(document.getElementById('tagQty').value) || 1);
-  const area = document.getElementById('printArea');
-  let html = '';
-  for(let i=0;i<qty;i++){
-    html += `<div class="print-barcode-strip"><svg class="bcstrip${i}"></svg></div>`;
-  }
-  area.innerHTML = html;
-  for(let i=0;i<qty;i++){
-    try{ JsBarcode(area.querySelectorAll('svg')[i], p.barcode, { format:"CODE128", displayValue:true, fontSize:14, height:50, margin:6 }); }catch(e){}
-  }
-  setTimeout(()=> window.print(), 300);
+function renderTagArea(){
+  const area = document.getElementById('tagArea');
+  if(!area) return;
+  if(!tagQueue.length){ area.innerHTML = `<div class="empty-note">ค้นหาแล้วเลือกสินค้า (เลือกได้หลายรายการ) เพื่อสร้างป้ายราคา/บาร์โค้ด</div>`; return; }
+  const prevLayout = (document.getElementById('tagLayout')||{}).value || 'portrait';
+  area.innerHTML = `
+    <div class="card">
+      <h2>รายการป้าย (${tagQueue.length} สินค้า)</h2>
+      <label>รูปแบบป้าย</label>
+      <select id="tagLayout"><option value="portrait">แนวตั้ง</option><option value="landscape">แนวนอน</option></select>
+      <div id="queueList"></div>
+      <div class="msg" id="tagMsg"></div>
+      <h2>ตัวอย่างป้าย</h2>
+      <div id="tagPreview"></div>
+      <button class="btn" id="printTagBtn">🖨️ พิมพ์ป้ายทั้งหมด</button>
+      <button class="btn outline" id="printBcBtn">🖨️ พิมพ์เฉพาะบาร์โค้ด</button>
+      <button class="btn outline" id="genMissingBtn">🔄 สร้างบาร์โค้ดให้สินค้าที่ยังไม่มี</button>
+      <button class="btn outline" id="clearQueueBtn">ล้างรายการทั้งหมด</button>
+    </div>`;
+  const lay = document.getElementById('tagLayout'); lay.value = prevLayout; lay.onchange = renderPreview;
+  renderQueue(); renderPreview();
+  document.getElementById('printTagBtn').onclick = ()=> openPrint(allTagsHTML());
+  document.getElementById('printBcBtn').onclick = printBarcodes;
+  document.getElementById('genMissingBtn').onclick = generateMissingBarcodes;
+  document.getElementById('clearQueueBtn').onclick = ()=>{ tagQueue=[]; renderTagArea(); };
 }
 
-function printPriceTags(){
-  const p = productsCache[selectedProductId];
-  const shopName = shopSettings.shopName || (shopsCache[currentBranch.shopId] || {}).info?.name || 'ร้านค้า';
-  const discountVal = parseFloat(document.getElementById('tagDiscountPrice').value) || 0;
-  const origPrice = p.sellPrice || 0;
-  const showDiscount = discountVal > 0 && discountVal < origPrice;
-  const qty = Math.max(1, parseInt(document.getElementById('tagQty').value) || 1);
-
-  const area = document.getElementById('printArea');
-  let html = '<div class="print-tags-grid">';
-  for(let i=0;i<qty;i++){
-    html += `
-      <div class="print-tag">
-        <div class="pshop">${shopName}</div>
-        <div class="pname">${p.name}</div>
-        <div class="pprice-row">
-          ${showDiscount ? `<span class="porig">฿${origPrice.toLocaleString()}</span>` : ''}
-          <span class="pprice">฿${(showDiscount ? discountVal : origPrice).toLocaleString()}</span>
-        </div>
-        ${p.barcode ? `<svg class="tagbc${i}"></svg>` : ''}
+function renderQueue(){
+  const wrap = document.getElementById('queueList');
+  wrap.innerHTML = tagQueue.map((r,i)=>{
+    const p = productsCache[r.pid];
+    return `<div class="qrow">
+      <div class="qhead"><b>${esc(p.name)}</b><span class="qdel" data-del="${i}">✕ เอาออก</span></div>
+      ${p.barcode?'':`<div class="qwarn">⚠️ สินค้านี้ยังไม่มีบาร์โค้ด — กดปุ่ม "สร้างบาร์โค้ด" ด้านล่างก่อนพิมพ์</div>`}
+      <div class="row2">
+        <div><label>จำนวนป้าย</label><input type="number" min="1" value="${r.qty}" data-i="${i}" data-f="qty"></div>
+        <div><label>ประเภทป้าย</label><select data-i="${i}" data-f="mode">
+          <option value="normal" ${r.mode==='normal'?'selected':''}>ปกติ</option>
+          <option value="promo" ${r.mode==='promo'?'selected':''}>โปรโมชั่น</option>
+          <option value="clear" ${r.mode==='clear'?'selected':''}>เคลียร์ใกล้หมดอายุ</option></select></div>
       </div>
-    `;
-  }
-  html += '</div>';
-  area.innerHTML = html;
-  if(p.barcode){
-    for(let i=0;i<qty;i++){
-      try{ JsBarcode(area.querySelectorAll('.print-tag svg')[i], p.barcode, { format:"CODE128", displayValue:true, fontSize:10, height:30, margin:2, width:1.4 }); }catch(e){}
-    }
-  }
+      <label>ราคาบนป้าย (ว่าง = ราคาปกติ ฿${(p.sellPrice||0).toLocaleString()})</label>
+      <input type="number" value="${esc(r.price)}" data-i="${i}" data-f="price" placeholder="เช่น ราคาโปรโมชั่น">
+      ${r.mode!=='normal'?`<div class="row2">
+        <div><label>เริ่มวัน-เวลา</label><input type="datetime-local" value="${esc(r.from)}" data-i="${i}" data-f="from"></div>
+        <div><label>ป้ายหมดอายุวัน-เวลา</label><input type="datetime-local" value="${esc(r.until)}" data-i="${i}" data-f="until"></div></div>`:''}
+      ${r.mode==='clear'?`<label>วันหมดอายุของสินค้า</label><input type="date" value="${esc(r.prodExp)}" data-i="${i}" data-f="prodExp">`:''}
+    </div>`;
+  }).join('');
+  wrap.oninput = e=>{ const t=e.target; if(t.dataset.f && t.tagName!=='SELECT'){ tagQueue[t.dataset.i][t.dataset.f]=t.value; renderPreview(); } };
+  wrap.onchange = e=>{ const t=e.target; if(t.tagName==='SELECT'){ tagQueue[t.dataset.i].mode=t.value; renderQueue(); renderPreview(); } };
+  wrap.onclick = e=>{ const d=e.target.dataset.del; if(d!==undefined){ tagQueue.splice(parseInt(d),1); renderTagArea(); } };
+}
+function renderPreview(){
+  const layout = document.getElementById('tagLayout').value;
+  const pv = document.getElementById('tagPreview');
+  pv.innerHTML = `<div class="grid">${tagQueue.map(r=>tagHTML(r,layout)).join('')}</div>`;
+  renderSvgs(pv);
+}
+
+function generateMissingBarcodes(){
+  const base = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}/products/`;
+  const missing = tagQueue.filter(r=>!productsCache[r.pid].barcode);
+  if(!missing.length){ document.getElementById('tagMsg').className='msg ok'; document.getElementById('tagMsg').textContent='ทุกสินค้ามีบาร์โค้ดแล้ว'; return; }
+  const seed = Date.now();
+  Promise.all(missing.map((r,k)=>{
+    const code = '2' + String(seed + k).slice(-11);
+    productsCache[r.pid].barcode = code;
+    return db.ref(base + r.pid + '/barcode').set(code);
+  })).then(()=>{ renderTagArea(); const m=document.getElementById('tagMsg'); m.className='msg ok'; m.textContent=`สร้างบาร์โค้ดให้ ${missing.length} สินค้าแล้ว`; })
+    .catch(()=>{ const m=document.getElementById('tagMsg'); m.className='msg error'; m.textContent='บันทึกบาร์โค้ดไม่สำเร็จ ลองใหม่อีกครั้ง'; });
+}
+
+function printBarcodes(){
+  let out='';
+  tagQueue.forEach(r=>{
+    const p = productsCache[r.pid]; if(!p.barcode) return;
+    const n = Math.max(1, parseInt(r.qty)||1);
+    for(let k=0;k<n;k++) out += `<div class="bcstrip"><div style="font-size:10px">${esc(p.name)}</div><svg class="bcsvg" data-code="${esc(p.barcode)}" data-h="50" data-fs="14" data-m="6" data-w="2"></svg></div>`;
+  });
+  if(!out){ alert('ไม่มีสินค้าที่มีบาร์โค้ด กรุณาสร้างบาร์โค้ดก่อน'); return; }
+  openPrint(out);
+}
+
+function openPrint(body){
+  if(!body) return;
+  const area = document.getElementById('printArea');
+  area.innerHTML = `<div class="grid">${body}</div>`;
+  renderSvgs(area);
   setTimeout(()=> window.print(), 300);
 }
 </script>
