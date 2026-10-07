@@ -405,26 +405,26 @@ function renderSearchResults(){
 
 const TAG_CSS = `
 .grid{display:flex;flex-wrap:wrap;gap:3mm}
-.pt{width:55mm;max-width:100%;min-height:42mm;padding:2.5mm;border:1px dashed #888;text-align:center;background:#fff;color:#000;
+.pt{width:45mm;max-width:100%;padding:2mm;border:1px dashed #888;text-align:center;background:#fff;color:#000;
   box-sizing:border-box;page-break-inside:avoid;break-inside:avoid;font-family:'Sarabun',sans-serif;
   -webkit-print-color-adjust:exact;print-color-adjust:exact}
-.pt .banner{background:#dc2626;color:#fff;font-family:'Kanit',sans-serif;font-size:11px;padding:1px 4px;margin:-2.5mm -2.5mm 2mm;}
+.pt .banner{background:#dc2626;color:#fff;font-family:'Kanit',sans-serif;font-size:11px;padding:1px 4px;margin:-2mm -2mm 1.5mm;}
 .pt .banner.promo{background:#ea580c}
 .pt .shop{font-size:9px;color:#555}
-.pt .name{font-family:'Kanit',sans-serif;font-size:13px;line-height:1.2;margin:2px 0}
+.pt .name{font-family:'Kanit',sans-serif;font-size:11px;line-height:1.2;margin:2px 0}
 .pt .prow{display:flex;align-items:baseline;justify-content:center;gap:6px}
 .pt .orig{text-decoration:line-through;color:#888;font-size:12px}
-.pt .price{font-family:'Kanit',sans-serif;font-size:26px;font-weight:700;line-height:1.1}
+.pt .price{font-family:'Kanit',sans-serif;font-size:22px;font-weight:700;line-height:1.1}
 .pt .dates{font-size:9px;color:#333;line-height:1.35;margin-top:2px}
 .pt .bc{max-width:100%;height:auto;margin-top:3px}
 .pt .nobc{font-size:9px;color:#999;margin-top:4px}
 .pt svg{max-width:100%;height:auto}
-.pt.land{width:95mm;max-width:100%;display:flex;flex-direction:column;justify-content:space-between;gap:2mm;text-align:left}
+.pt.land{width:62mm;max-width:100%;min-height:0;display:flex;flex-direction:column;justify-content:flex-start;gap:1mm;text-align:left}
 .pt.land .ltop{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm}
 .pt.land .lname{flex:1;min-width:0}
 .pt.land .lprice{flex:none;text-align:right}
 .pt.land .prow{justify-content:flex-end}
-.pt.land .price{font-size:30px}
+.pt.land .price{font-size:24px}
 .pt.land .lbc{text-align:center}
 .pt.land .lbc .bc{margin-top:0}
 .bcstrip{width:60mm;padding:3mm;border:1px dashed #888;text-align:center;box-sizing:border-box;page-break-inside:avoid;break-inside:avoid}
@@ -484,7 +484,7 @@ function tagHTML(r, layout){
     if(r.until) dates += `ป้ายหมดอายุ ${fmtDT(r.until)}<br>`;
     if(r.mode==='clear' && r.prodExp) dates += `สินค้าหมดอายุ ${fmtD(r.prodExp)}`;
   }
-  const bc = p.barcode ? `<svg class="bcsvg" data-code="${esc(p.barcode)}" data-h="${layout==='landscape'?40:30}"></svg>` : `<div class="nobc">ยังไม่มีบาร์โค้ด</div>`;
+  const bc = p.barcode ? `<svg class="bcsvg" data-code="${esc(p.barcode)}" data-h="${layout==='landscape'?24:26}" data-fs="9" data-w="1.2" data-m="1"></svg>` : `<div class="nobc">ยังไม่มีบาร์โค้ด</div>`;
   const prow = `<div class="prow">${pr.disc?`<span class="orig">฿${pr.orig.toLocaleString()}</span>`:''}<span class="price">฿${pr.price.toLocaleString()}</span></div>`;
   const dl = dates?`<div class="dates">${dates}</div>`:'';
   const main = `<div class="shop">${esc(shopName)}</div><div class="name">${esc(p.name)}</div>${prow}${dl}`;
