@@ -227,6 +227,38 @@ function saveDebt(){
   };
   const signatureData = document.getElementById('sigPad').toDataURL('image/png');
 
+  const baseChk = `shops/${sale.shopId}/branches/${sale.branchId}`;
+  const saveBtn = document.getElementById('saveBtn'); saveBtn.disabled = true;
+  Promise.all([ db.ref(baseChk + '/debtors').once('value'), db.ref(baseChk + '/debtConfig').once('value') ]).then(([ds, cs])=>{
+    const problem = checkLimits(customer, ds.val() || {}, cs.val() || {});
+    if(problem){ msg.textContent = problem; saveBtn.disabled = false; return; }
+    doSaveDebt(customer, signatureData);
+  }).catch(err=>{ msg.textContent = 'ตรวจวงเงินไม่สำเร็จ: ' + err.message; saveBtn.disabled = false; });
+}
+
+function encKey(k){ return btoa(unescape(encodeURIComponent(k))).replace(/[+/=]/g, c=>({'+':'-','/':'_','=':''}[c])); }
+function custKey(c){ c=c||{}; return (c.idCard && c.idCard.trim()) || ((c.firstName||'')+' '+(c.lastName||'')+'|'+(c.phone||'')).trim(); }
+function checkLimits(customer, debts, cfg){
+  const key = custKey(customer); let shopOut = 0, custOut = 0;
+  Object.values(debts).forEach(x=>{
+    const r = Math.max(0, (x.total||0) - (x.amountPaid||0));
+    shopOut += r; if(custKey(x.customer) === key) custOut += r;
+  });
+  const add = sale.grandTotal || 0;
+  const tl = Number(cfg.totalLimit) || 0;
+  const co = (cfg.customers || {})[encKey(key)];
+  const cl = (co && co.limit != null) ? Number(co.limit) : ((Number(cfg.defaultLimit) || 0) || null);
+  const f = n => '฿' + n.toLocaleString();
+  if(cl !== null && custOut + add > cl)
+    return `เกินวงเงินรายบุคคล: ลูกค้าค้างอยู่ ${f(custOut)} วงเงิน ${f(cl)} (ซื้อเชื่อเพิ่มได้อีก ${f(Math.max(0, cl - custOut))}) บิลนี้ ${f(add)}`;
+  if(tl > 0 && shopOut + add > tl)
+    return `เกินวงเงินหนี้ของร้าน: ร้านมียอดค้างอยู่ ${f(shopOut)} วงเงิน ${f(tl)} (ให้ซื้อเชื่อเพิ่มได้อีก ${f(Math.max(0, tl - shopOut))}) บิลนี้ ${f(add)}`;
+  return '';
+}
+
+function doSaveDebt(customer, signatureData){
+  const msg = document.getElementById('saveMsg');
+  msg.className = 'msg error';
   const basePath = `shops/${sale.shopId}/branches/${sale.branchId}`;
   const debtRef = db.ref(basePath + '/debtors').push();
   const debtData = {

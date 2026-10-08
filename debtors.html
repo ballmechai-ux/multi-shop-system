@@ -84,7 +84,8 @@ let session = null, cb = null;
 try{ session = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
 try{ cb = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
 
-let debts = {}, shopSettings = {};
+let debts = {}, shopSettings = {}, cfg = {};
+const canEdit = session && (session.role==='admin' || session.role==='owner');
 let view = { name:'list', key:null };
 let showAll = false, searchText = '', payMethod = 'cash', lastPay = null;
 const METHODS = { cash:'เงินสด', transfer:'โอนเงิน', qr:'QR Payment', other:'อื่นๆ' };
@@ -101,11 +102,19 @@ if(!session){
 } else {
   const base = `shops/${cb.shopId}/branches/${cb.branchId}`;
   db.ref(base + '/settings').once('value').then(s=>{ shopSettings = s.val() || {}; });
+  db.ref(base + '/debtConfig').on('value', snap=>{ cfg = snap.val() || {}; render(); });
   db.ref(base + '/debtors').on('value', snap=>{ debts = snap.val() || {}; render(); });
 }
 const BASE = () => `shops/${cb.shopId}/branches/${cb.branchId}`;
 
 function custKey(c){ c=c||{}; return (c.idCard && c.idCard.trim()) || ((c.firstName||'')+' '+(c.lastName||'')+'|'+(c.phone||'')).trim(); }
+function encKey(k){ return btoa(unescape(encodeURIComponent(k))).replace(/[+/=]/g, c=>({'+':'-','/':'_','=':''}[c])); }
+function limitFor(key){
+  const co = (cfg.customers||{})[encKey(key)];
+  if(co && co.limit!=null) return { limit:Number(co.limit), custom:true };
+  const d = Number(cfg.defaultLimit)||0;
+  return { limit: d>0 ? d : null, custom:false };
+}
 function groupCustomers(){
   const g = {};
   Object.keys(debts).forEach(id=>{
@@ -129,6 +138,7 @@ function renderList(){
   let list = Object.values(g);
   const totalOut = list.reduce((a,c)=>a+c.outstanding,0);
   const nOwing = list.filter(c=>c.outstanding>0).length;
+  const tl = Number(cfg.totalLimit)||0, dl = Number(cfg.defaultLimit)||0;
   if(!showAll) list = list.filter(c=>c.outstanding>0);
   const q = searchText.trim().toLowerCase();
   if(q) list = list.filter(c=> (c.name+' '+c.phone+' '+c.idCard).toLowerCase().includes(q));
@@ -137,11 +147,30 @@ function renderList(){
     <div class="topbar"><h1>📒 ลูกหนี้</h1><span class="back-link" onclick="location.href='home.html'">← หน้าหลัก</span></div>
     <div class="card"><div class="line"><span>ยอดค้างชำระรวม</span><span class="amt">${fm(totalOut)}</span></div>
       <div class="line"><span>ลูกค้าที่ยังค้างอยู่</span><span>${nOwing} คน</span></div></div>
+    <div class="card">
+      <div class="line"><span>วงเงินหนี้ร้านทั้งหมด</span><span>${tl?fm(tl):'ไม่จำกัด'}</span></div>
+      ${tl?`<div class="line"><span>ค้างอยู่ / ซื้อเชื่อเพิ่มได้อีก</span><span style="color:${totalOut>=tl?'var(--danger)':'var(--ok)'}">${fm(totalOut)} / ${fm(Math.max(0,tl-totalOut))}</span></div>`:''}
+      <div class="line"><span>วงเงินต่อคน (ค่าเริ่มต้น)</span><span>${dl?fm(dl):'ไม่จำกัด'}</span></div>
+      ${canEdit?`<div id="limEdit" style="display:none;margin-top:8px">
+        <label>วงเงินหนี้ร้านทั้งหมด (0 = ไม่จำกัด)</label><input type="number" id="limTotal" inputmode="decimal" value="${tl||''}">
+        <label>วงเงินต่อคน ค่าเริ่มต้น (0 = ไม่จำกัด)</label><input type="number" id="limDef" inputmode="decimal" value="${dl||''}">
+        <button class="btn" id="limSave">💾 บันทึกวงเงิน</button></div>
+        <button class="btn outline" id="limBtn">✏️ ตั้งวงเงินหนี้</button>`:''}
+    </div>
     <input id="q" placeholder="ค้นหาชื่อ / เบอร์โทร / เลขบัตร" value="${esc(searchText)}">
     <div class="toggle"><div id="tOwe" class="${showAll?'':'active'}">เฉพาะที่ค้างอยู่</div><div id="tAll" class="${showAll?'active':''}">ทั้งหมด</div></div>
     ${list.length? list.map(c=>`<div class="card"><div class="row" data-k="${esc(c.key)}"><div><div class="nm">${esc(c.name)}</div><div class="sm">${esc(c.phone||'-')} · ${c.debts.length} บิล</div></div><div class="amt ${c.outstanding?'':'zero'}">${c.outstanding?fm(c.outstanding):'ชำระครบ'}</div></div></div>`).join('')
       : `<div class="empty-note">ไม่พบรายการลูกหนี้</div>`}
   </div>`;
+  const lb = document.getElementById('limBtn');
+  if(lb){
+    lb.onclick = ()=>{ const e=document.getElementById('limEdit'); e.style.display = e.style.display==='none'?'block':'none'; };
+    document.getElementById('limSave').onclick = ()=>{
+      const t = Math.max(0, parseFloat(document.getElementById('limTotal').value)||0);
+      const d = Math.max(0, parseFloat(document.getElementById('limDef').value)||0);
+      db.ref(BASE()+'/debtConfig').update({ totalLimit:t, defaultLimit:d });
+    };
+  }
   const qi = document.getElementById('q');
   qi.oninput = ()=>{ searchText = qi.value; const pos=qi.selectionStart; renderList(); const n=document.getElementById('q'); n.focus(); n.setSelectionRange(pos,pos); };
   document.getElementById('tOwe').onclick = ()=>{ showAll=false; renderList(); };
@@ -153,12 +182,16 @@ function renderCust(){
   const c = groupCustomers()[view.key];
   if(!c){ view={name:'list'}; return render(); }
   const totalAll = c.debts.reduce((a,d)=>a+(d.total||0),0);
+  const li = limitFor(c.key);
   app.innerHTML = `<div class="wrap">
     <div class="topbar"><h1>👤 ${esc(c.name)}</h1><span class="back-link" id="bk">← รายชื่อ</span></div>
     <div class="card">
       <div class="line"><span>เบอร์โทร</span><span>${esc(c.phone||'-')}</span></div>
       <div class="line"><span>เลขบัตรประชาชน</span><span>${esc(c.idCard||'-')}</span></div>
       <div class="line"><span>ยอดซื้อเชื่อสะสม</span><span>${fm(totalAll)}</span></div>
+      <div class="line"><span>วงเงินรายนี้${li.custom?' (กำหนดเอง)':''}</span><span>${li.limit!=null?fm(li.limit):'ไม่จำกัด'}</span></div>
+      ${li.limit!=null?`<div class="line"><span>ซื้อเชื่อเพิ่มได้อีก</span><span style="color:${c.outstanding>=li.limit?'var(--danger)':'var(--ok)'}">${fm(Math.max(0,li.limit-c.outstanding))}</span></div>`:''}
+      ${canEdit?`<div class="line"><span style="color:var(--accent);cursor:pointer" id="limCust">✏️ ตั้งวงเงินรายนี้</span></div>`:''}
       <div class="line grand"><span>ค้างชำระ</span><span style="color:${c.outstanding?'var(--warn)':'var(--ok)'}">${fm(c.outstanding)}</span></div>
       ${c.outstanding>0?`<button class="btn" id="payBtn">💰 ชำระหนี้</button>`:''}
     </div>
@@ -179,6 +212,14 @@ function renderCust(){
     }).join('')}
   </div>`;
   document.getElementById('bk').onclick = ()=>{ view={name:'list'}; render(); };
+  const lc = document.getElementById('limCust');
+  if(lc) lc.onclick = ()=>{
+    const v = prompt('วงเงินหนี้ของ '+c.name.trim()+' (บาท)\nเว้นว่าง = ใช้ค่าเริ่มต้นของร้าน\n0 = ห้ามซื้อเชื่อเพิ่ม', li.custom? li.limit : '');
+    if(v===null) return;
+    const ref = db.ref(BASE()+'/debtConfig/customers/'+encKey(c.key));
+    if(v.trim()==='') ref.remove();
+    else { const n = parseFloat(v); if(isNaN(n)||n<0){ alert('กรุณาใส่ตัวเลข'); return; } ref.set({ limit:n, name:c.name.trim() }); }
+  };
   const pb = document.getElementById('payBtn'); if(pb) pb.onclick = ()=>{ view={name:'pay', key:view.key}; payMethod='cash'; render(); window.scrollTo(0,0); };
 }
 
