@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ลูกหนี้</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --accent2:#2563eb;
+    --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --warn:#fbbf24; --border:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ font-family:'Sarabun',sans-serif; background:linear-gradient(160deg,var(--bg1),var(--bg2));
+    min-height:100vh; color:var(--text); padding:16px; padding-bottom:60px; }
+  .wrap{ max-width:520px; margin:0 auto; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .topbar h1{ font-family:'Kanit'; font-size:17px; }
+  .back-link{ color:var(--accent); font-size:13px; cursor:pointer; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:18px; padding:16px; margin-bottom:12px; }
+  .card h2{ font-family:'Kanit'; font-size:14.5px; margin-bottom:10px; }
+  label{ font-size:12.5px; color:var(--sub); display:block; margin-bottom:5px; }
+  input{ width:100%; padding:12px 13px; margin-bottom:10px; border-radius:12px; border:1px solid var(--border);
+    background:#0f172a; color:var(--text); font-size:14px; font-family:'Sarabun'; }
+  .line{ display:flex; justify-content:space-between; font-size:13px; padding:4px 0; color:var(--sub); gap:10px; }
+  .line.item{ color:var(--text); }
+  .line.grand{ font-family:'Kanit'; font-size:18px; color:var(--text); border-top:1px solid var(--border); margin-top:6px; padding-top:9px; }
+  .btn{ width:100%; padding:14px; border:none; border-radius:14px; background:var(--accent); color:#fff;
+    font-family:'Kanit'; font-size:16px; font-weight:500; cursor:pointer; margin-top:8px; }
+  .btn:disabled{ background:#334155; color:#64748b; }
+  .btn.outline{ background:transparent; border:1px solid var(--border); color:var(--sub); }
+  .row{ display:flex; justify-content:space-between; align-items:center; gap:10px; cursor:pointer; }
+  .row .nm{ font-family:'Kanit'; font-size:14.5px; }
+  .row .sm{ font-size:12px; color:var(--sub); }
+  .amt{ font-family:'Kanit'; font-size:16px; color:var(--warn); white-space:nowrap; }
+  .amt.zero{ color:var(--ok); }
+  .badge{ font-size:11px; padding:2px 9px; border-radius:10px; }
+  .badge.unpaid{ background:#ef444422; color:#fca5a5; } .badge.partial{ background:#fbbf2422; color:var(--warn); } .badge.paid{ background:#22c55e22; color:#86efac; }
+  details{ margin:6px 0; } summary{ font-size:12.5px; color:var(--accent); cursor:pointer; }
+  .pay-hist{ font-size:12px; color:var(--sub); border-top:1px dashed var(--border); margin-top:8px; padding-top:6px; }
+  .method-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+  .method-chip{ padding:12px; border:1px solid var(--border); border-radius:12px; text-align:center; font-size:13.5px; cursor:pointer; color:var(--sub); }
+  .method-chip.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+  .quick{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .quick div{ padding:8px 12px; border:1px solid var(--border); border-radius:10px; font-size:13px; cursor:pointer; color:var(--sub); }
+  .change-box{ background:#0f172a; border:1px solid var(--border); border-radius:12px; padding:12px; text-align:center; }
+  .change-box .cval{ font-family:'Kanit'; font-size:22px; color:var(--ok); } .change-box .cval.neg{ color:var(--danger); }
+  .msg{ font-size:13px; margin-top:8px; min-height:16px; } .msg.error{ color:var(--danger); }
+  .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:40px 20px; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+  .toggle{ display:flex; gap:8px; margin-bottom:10px; }
+  .toggle div{ flex:1; text-align:center; padding:9px; border:1px solid var(--border); border-radius:12px; font-size:13px; color:var(--sub); cursor:pointer; }
+  .toggle div.active{ border-color:var(--accent); color:#93c5fd; background:#2563eb22; }
+
+  #printArea{ position:absolute; left:-9999px; top:0; width:220px; background:#fff; color:#000; padding:12px; font-family:'Sarabun'; }
+  #printArea h2{ font-family:'Kanit'; text-align:center; font-size:16px; margin-bottom:6px; }
+  #printArea .pline{ display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
+  #printArea .ptotal{ font-weight:bold; font-size:14px; border-top:1px solid #000; margin-top:6px; padding-top:6px; }
+  @media print{ body *{ visibility:hidden; } #printArea, #printArea *{ visibility:visible; } #printArea{ position:absolute; left:0; top:0; } }
+</style>
+</head>
+<body>
+<div id="app"><div class="blocked">กำลังโหลด...</div></div>
+<div id="printArea"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+
+let session = null, cb = null;
+try{ session = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
+try{ cb = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+
+let debts = {}, shopSettings = {};
+let view = { name:'list', key:null };
+let showAll = false, searchText = '', payMethod = 'cash', lastPay = null;
+const METHODS = { cash:'เงินสด', transfer:'โอนเงิน', qr:'QR Payment', other:'อื่นๆ' };
+
+const esc = t => String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fm = n => '฿' + (Number(n)||0).toLocaleString();
+const fdt = ts => new Date(ts).toLocaleString('th-TH',{day:'numeric',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+const remain = d => Math.max(0, (d.total||0) - (d.amountPaid||0));
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6;">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(!cb || !cb.shopId || !cb.branchId){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เลือกสาขา</h1><br><a href="home.html" style="color:#3b82f6;">ไปหน้าหลักเพื่อเลือกสาขา</a></div>`;
+} else {
+  const base = `shops/${cb.shopId}/branches/${cb.branchId}`;
+  db.ref(base + '/settings').once('value').then(s=>{ shopSettings = s.val() || {}; });
+  db.ref(base + '/debtors').on('value', snap=>{ debts = snap.val() || {}; render(); });
+}
+const BASE = () => `shops/${cb.shopId}/branches/${cb.branchId}`;
+
+function custKey(c){ c=c||{}; return (c.idCard && c.idCard.trim()) || ((c.firstName||'')+' '+(c.lastName||'')+'|'+(c.phone||'')).trim(); }
+function groupCustomers(){
+  const g = {};
+  Object.keys(debts).forEach(id=>{
+    const d = Object.assign({id}, debts[id]); const k = custKey(d.customer);
+    if(!g[k]) g[k] = { key:k, name:((d.customer||{}).firstName||'')+' '+((d.customer||{}).lastName||''), phone:(d.customer||{}).phone||'', idCard:(d.customer||{}).idCard||'', debts:[], outstanding:0 };
+    g[k].debts.push(d); g[k].outstanding += remain(d);
+  });
+  Object.values(g).forEach(c=> c.debts.sort((a,b)=>(b.date||0)-(a.date||0)));
+  return g;
+}
+
+function render(){
+  if(view.name==='list') renderList();
+  else if(view.name==='cust') renderCust();
+  else if(view.name==='pay') renderPay();
+  else if(view.name==='done') renderDone();
+}
+
+function renderList(){
+  const g = groupCustomers();
+  let list = Object.values(g);
+  const totalOut = list.reduce((a,c)=>a+c.outstanding,0);
+  const nOwing = list.filter(c=>c.outstanding>0).length;
+  if(!showAll) list = list.filter(c=>c.outstanding>0);
+  const q = searchText.trim().toLowerCase();
+  if(q) list = list.filter(c=> (c.name+' '+c.phone+' '+c.idCard).toLowerCase().includes(q));
+  list.sort((a,b)=>b.outstanding-a.outstanding);
+  app.innerHTML = `<div class="wrap">
+    <div class="topbar"><h1>📒 ลูกหนี้</h1><span class="back-link" onclick="location.href='home.html'">← หน้าหลัก</span></div>
+    <div class="card"><div class="line"><span>ยอดค้างชำระรวม</span><span class="amt">${fm(totalOut)}</span></div>
+      <div class="line"><span>ลูกค้าที่ยังค้างอยู่</span><span>${nOwing} คน</span></div></div>
+    <input id="q" placeholder="ค้นหาชื่อ / เบอร์โทร / เลขบัตร" value="${esc(searchText)}">
+    <div class="toggle"><div id="tOwe" class="${showAll?'':'active'}">เฉพาะที่ค้างอยู่</div><div id="tAll" class="${showAll?'active':''}">ทั้งหมด</div></div>
+    ${list.length? list.map(c=>`<div class="card"><div class="row" data-k="${esc(c.key)}"><div><div class="nm">${esc(c.name)}</div><div class="sm">${esc(c.phone||'-')} · ${c.debts.length} บิล</div></div><div class="amt ${c.outstanding?'':'zero'}">${c.outstanding?fm(c.outstanding):'ชำระครบ'}</div></div></div>`).join('')
+      : `<div class="empty-note">ไม่พบรายการลูกหนี้</div>`}
+  </div>`;
+  const qi = document.getElementById('q');
+  qi.oninput = ()=>{ searchText = qi.value; const pos=qi.selectionStart; renderList(); const n=document.getElementById('q'); n.focus(); n.setSelectionRange(pos,pos); };
+  document.getElementById('tOwe').onclick = ()=>{ showAll=false; renderList(); };
+  document.getElementById('tAll').onclick = ()=>{ showAll=true; renderList(); };
+  document.querySelectorAll('.row[data-k]').forEach(el=> el.onclick = ()=>{ view={name:'cust', key:el.dataset.k}; render(); window.scrollTo(0,0); });
+}
+
+function renderCust(){
+  const c = groupCustomers()[view.key];
+  if(!c){ view={name:'list'}; return render(); }
+  const totalAll = c.debts.reduce((a,d)=>a+(d.total||0),0);
+  app.innerHTML = `<div class="wrap">
+    <div class="topbar"><h1>👤 ${esc(c.name)}</h1><span class="back-link" id="bk">← รายชื่อ</span></div>
+    <div class="card">
+      <div class="line"><span>เบอร์โทร</span><span>${esc(c.phone||'-')}</span></div>
+      <div class="line"><span>เลขบัตรประชาชน</span><span>${esc(c.idCard||'-')}</span></div>
+      <div class="line"><span>ยอดซื้อเชื่อสะสม</span><span>${fm(totalAll)}</span></div>
+      <div class="line grand"><span>ค้างชำระ</span><span style="color:${c.outstanding?'var(--warn)':'var(--ok)'}">${fm(c.outstanding)}</span></div>
+      ${c.outstanding>0?`<button class="btn" id="payBtn">💰 ชำระหนี้</button>`:''}
+    </div>
+    <h2 style="font-family:Kanit;font-size:14px;margin:6px 4px 10px">ประวัติบิลหนี้ (${c.debts.length})</h2>
+    ${c.debts.map(d=>{
+      const st = remain(d)<=0 ? 'paid' : ((d.amountPaid||0)>0 ? 'partial' : 'unpaid');
+      const pays = d.payments ? Object.values(d.payments).sort((a,b)=>a.date-b.date) : [];
+      return `<div class="card">
+        <div class="line" style="color:var(--text)"><span>เลขที่ ${esc(d.docNo||d.id.slice(-6).toUpperCase())} · ${fdt(d.date)}</span><span class="badge ${st}">${{unpaid:'ค้างชำระ',partial:'ชำระบางส่วน',paid:'ชำระครบ'}[st]}</span></div>
+        <div class="line"><span>ยอดบิล</span><span>${fm(d.total)}</span></div>
+        <div class="line"><span>ชำระแล้ว</span><span>${fm(d.amountPaid)}</span></div>
+        <div class="line item"><span>คงเหลือ</span><span style="color:var(--warn)">${fm(remain(d))}</span></div>
+        <details><summary>ดูรายการสินค้า (${(d.items||[]).length})</summary>
+          ${(d.items||[]).map(it=>`<div class="line item"><span>${esc(it.name)} x${it.qty}</span><span>${fm(it.price*it.qty-(it.discount||0))}</span></div>`).join('')}
+        </details>
+        ${pays.length?`<div class="pay-hist">ประวัติการชำระ<br>${pays.map(p=>`${fdt(p.date)} · ${fm(p.amount)} · ${METHODS[p.method]||p.method} · ${esc(p.staffName||'')}`).join('<br>')}</div>`:''}
+      </div>`;
+    }).join('')}
+  </div>`;
+  document.getElementById('bk').onclick = ()=>{ view={name:'list'}; render(); };
+  const pb = document.getElementById('payBtn'); if(pb) pb.onclick = ()=>{ view={name:'pay', key:view.key}; payMethod='cash'; render(); window.scrollTo(0,0); };
+}
+
+function renderPay(){
+  const c = groupCustomers()[view.key];
+  if(!c || c.outstanding<=0){ view={name:'cust', key:view.key}; return render(); }
+  const out = c.outstanding;
+  app.innerHTML = `<div class="wrap">
+    <div class="topbar"><h1>💰 ชำระหนี้ · ${esc(c.name)}</h1><span class="back-link" id="bk">← กลับ</span></div>
+    <div class="card"><div class="line grand" style="border:none;margin:0;padding:0"><span>ยอดค้างทั้งหมด</span><span style="color:var(--warn)">${fm(out)}</span></div>
+      <div class="line" style="margin-top:6px">ชำระจะตัดบิลที่เก่าที่สุดก่อน</div></div>
+    <div class="card">
+      <label>จำนวนที่ชำระ (บาท)</label>
+      <input type="number" id="amt" inputmode="decimal" value="${out}">
+      <div class="quick"><div data-a="${out}">ชำระทั้งหมด ${fm(out)}</div>${[100,500,1000].filter(v=>v<out).map(v=>`<div data-a="${v}">${fm(v)}</div>`).join('')}</div>
+      <label>วิธีชำระเงิน</label>
+      <div class="method-grid">${Object.keys(METHODS).map(m=>`<div class="method-chip ${m===payMethod?'active':''}" data-m="${m}">${{cash:'💵',transfer:'🏦',qr:'📱',other:'➕'}[m]} ${METHODS[m]}</div>`).join('')}</div>
+      <div id="cashSec" style="display:${payMethod==='cash'?'block':'none'}">
+        <label>รับเงินมา (บาท)</label><input type="number" id="recv" inputmode="decimal" placeholder="0">
+        <div class="change-box"><div style="font-size:12px;color:var(--sub)">เงินทอน</div><div class="cval" id="chg">฿0</div></div>
+      </div>
+    </div>
+    <button class="btn" id="confirm">✅ ยืนยันการชำระหนี้</button>
+    <div class="msg error" id="pm"></div>
+  </div>`;
+  const amtEl = document.getElementById('amt'), recv = document.getElementById('recv');
+  const upd = ()=>{
+    const a = parseFloat(amtEl.value)||0, r = parseFloat(recv.value)||0;
+    const ch = r - a; const el = document.getElementById('chg');
+    el.textContent = '฿' + Math.abs(ch).toLocaleString(); el.className = 'cval' + (ch<0?' neg':'');
+    const ok = a>0 && a<=out + 0.0001 && (payMethod!=='cash' || r>=a);
+    document.getElementById('confirm').disabled = !ok;
+    document.getElementById('pm').textContent = a>out ? 'ยอดชำระเกินยอดค้าง' : '';
+  };
+  amtEl.oninput = upd; recv.oninput = upd;
+  document.querySelectorAll('.quick div').forEach(el=> el.onclick = ()=>{ amtEl.value = el.dataset.a; upd(); });
+  document.querySelectorAll('.method-chip').forEach(el=> el.onclick = ()=>{
+    payMethod = el.dataset.m;
+    document.querySelectorAll('.method-chip').forEach(x=>x.classList.toggle('active', x===el));
+    document.getElementById('cashSec').style.display = payMethod==='cash' ? 'block' : 'none'; upd();
+  });
+  document.getElementById('bk').onclick = ()=>{ view={name:'cust', key:view.key}; render(); };
+  document.getElementById('confirm').onclick = ()=> confirmPay(c);
+  upd();
+}
+
+function confirmPay(c){
+  const a = Math.round((parseFloat(document.getElementById('amt').value)||0)*100)/100;
+  const r = parseFloat(document.getElementById('recv').value)||0;
+  const btn = document.getElementById('confirm'); btn.disabled = true;
+  let left = a; const now = Date.now();
+  const payKey = db.ref(BASE()+'/debtPayments').push().key;
+  const payNo = 'DP' + payKey.slice(-6).toUpperCase();
+  const updates = {}; const allocs = [];
+  c.debts.filter(d=>remain(d)>0).sort((x,y)=>(x.date||0)-(y.date||0)).forEach(d=>{
+    if(left<=0) return;
+    const part = Math.min(left, remain(d)); left = Math.round((left-part)*100)/100;
+    const paidNow = Math.round(((d.amountPaid||0)+part)*100)/100;
+    updates[`debtors/${d.id}/amountPaid`] = paidNow;
+    updates[`debtors/${d.id}/status`] = paidNow >= d.total - 0.0001 ? 'paid' : 'partial';
+    updates[`debtors/${d.id}/payments/${payKey}`] = { payNo, amount:part, method:payMethod, staffUid:session.uid, staffName:session.name, date:now };
+    allocs.push({ debtId:d.id, docNo:d.docNo||d.id.slice(-6).toUpperCase(), amount:part });
+  });
+  updates[`debtPayments/${payKey}`] = { payNo, customerKey:c.key, customerName:c.name.trim(), amount:a, method:payMethod,
+    cashReceived: payMethod==='cash'? r : null, change: payMethod==='cash'? r-a : 0, allocations:allocs, staffUid:session.uid, staffName:session.name, date:now };
+  db.ref(BASE()).update(updates).then(()=>{
+    lastPay = { payNo, name:c.name.trim(), amount:a, method:payMethod, recv:r, change:r-a, allocs, date:now, before:c.outstanding, after:Math.max(0,c.outstanding-a), key:c.key };
+    view = { name:'done', key:c.key }; render();
+  }).catch(err=>{ document.getElementById('pm').textContent = 'เกิดข้อผิดพลาด: ' + err.message; btn.disabled=false; });
+}
+
+function renderDone(){
+  const p = lastPay;
+  app.innerHTML = `<div class="wrap"><div style="text-align:center;padding:24px 10px">
+    <div style="font-size:48px">✅</div><h1 style="font-family:Kanit">ชำระหนี้สำเร็จ</h1>
+    <div class="card" style="text-align:left;margin-top:16px">
+      <div class="line"><span>เลขที่ใบเสร็จ</span><span>${p.payNo}</span></div>
+      <div class="line"><span>ลูกค้า</span><span>${esc(p.name)}</span></div>
+      <div class="line"><span>วิธีชำระ</span><span>${METHODS[p.method]}</span></div>
+      <div class="line"><span>ยอดค้างก่อนชำระ</span><span>${fm(p.before)}</span></div>
+      <div class="line"><span>ชำระครั้งนี้</span><span>${fm(p.amount)}</span></div>
+      ${p.method==='cash'?`<div class="line"><span>รับเงิน / ทอน</span><span>${fm(p.recv)} / ${fm(p.change)}</span></div>`:''}
+      <div class="line grand"><span>คงเหลือ</span><span>${fm(p.after)}</span></div>
+    </div>
+    <button class="btn" id="prt">🖨️ พิมพ์ใบเสร็จ</button>
+    <button class="btn outline" id="back">กลับไปหน้าลูกค้า</button>
+  </div></div>`;
+  document.getElementById('prt').onclick = printReceipt;
+  document.getElementById('back').onclick = ()=>{ view={name:'cust', key:p.key}; render(); };
+}
+
+function printReceipt(){
+  const p = lastPay, area = document.getElementById('printArea');
+  area.style.width = shopSettings.paperWidth === '80' ? '300px' : '220px';
+  area.innerHTML = `
+    ${shopSettings.logoUrl?`<img src="${esc(shopSettings.logoUrl)}" style="max-width:80px;display:block;margin:0 auto 6px">`:''}
+    <h2>${esc(shopSettings.shopName||'ร้านค้า')}</h2>
+    ${shopSettings.address?`<div style="text-align:center;font-size:10.5px">${esc(shopSettings.address)}</div>`:''}
+    ${shopSettings.phone?`<div style="text-align:center;font-size:10.5px;margin-bottom:6px">โทร. ${esc(shopSettings.phone)}</div>`:''}
+    <div style="text-align:center;font-family:'Kanit';font-weight:bold;margin-bottom:6px">ใบเสร็จรับชำระหนี้</div>
+    <div class="pline"><span>เลขที่</span><span>${p.payNo}</span></div>
+    <div class="pline"><span>วันที่</span><span>${fdt(p.date)}</span></div>
+    <div class="pline"><span>ลูกค้า</span><span>${esc(p.name)}</span></div>
+    ${p.allocs.map(a=>`<div class="pline"><span>ตัดบิล ${esc(a.docNo)}</span><span>${fm(a.amount)}</span></div>`).join('')}
+    <div class="pline"><span>วิธีชำระ</span><span>${METHODS[p.method]}</span></div>
+    <div class="pline ptotal"><span>ชำระครั้งนี้</span><span>${fm(p.amount)}</span></div>
+    ${p.method==='cash'?`<div class="pline"><span>รับเงิน</span><span>${fm(p.recv)}</span></div><div class="pline"><span>เงินทอน</span><span>${fm(p.change)}</span></div>`:''}
+    <div class="pline"><span>ยอดค้างคงเหลือ</span><span>${fm(p.after)}</span></div>
+    ${shopSettings.receiptFooter?`<div style="text-align:center;font-size:10.5px;margin-top:10px;border-top:1px dashed #000;padding-top:6px">${esc(shopSettings.receiptFooter)}</div>`:''}`;
+  setTimeout(()=>window.print(), 300);
+}
+</script>
+</body>
+</html>
