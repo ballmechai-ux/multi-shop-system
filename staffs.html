@@ -203,9 +203,11 @@ function renderUserList(){
           <div class="meta">
             บทบาท: ${roleLabel}<br>
             เข้าถึง: ${accessList}<br>
-            สิทธิ์: ${permsOn}
+            สิทธิ์: ${permsOn}<br>
+            ห้ามใช้: ${DENY_LIST.filter(d=>u.deny&&u.deny[d.key]).map(d=>d.label).join(', ') || '-'}
           </div>
           <div class="row-actions">
+            <button class="btn small" data-action="deny" data-id="${id}">🚫 ตั้งสิทธิ์ห้ามใช้เมนู</button>
             <button class="btn danger small" data-action="del" data-id="${id}">ลบบัญชี</button>
           </div>
         </div>`;
@@ -219,9 +221,34 @@ function renderUserList(){
     content.prepend(card);
   }
   document.getElementById('userListInner').innerHTML = html;
+  document.querySelectorAll('[data-action="deny"]').forEach(btn=>{ btn.onclick = ()=> openDenyPanel(btn); });
   document.querySelectorAll('[data-action="del"]').forEach(btn=>{
     btn.onclick = ()=> deleteUser(btn.dataset.id, usersCache[btn.dataset.id].name);
   });
+}
+
+const DENY_LIST = [
+  {key:'dashboard', label:'Dashboard'}, {key:'sell', label:'ขายสินค้า'}, {key:'products', label:'สินค้า'},
+  {key:'stock', label:'สต็อก (ดูข้อมูล)'}, {key:'stockAdjust', label:'ปรับสต็อกโดยตรง (รับสินค้าเข้ายังทำได้)'},
+  {key:'receive', label:'รับสินค้าเข้า'}, {key:'pricetag', label:'ป้ายราคา'}, {key:'promotions', label:'โปรโมชั่น'},
+  {key:'sales', label:'รายการขาย'}, {key:'debtors', label:'ลูกหนี้'}, {key:'reports', label:'รายงาน'},
+  {key:'addproduct', label:'เพิ่มสินค้า'}, {key:'settings', label:'ตั้งค่า'}
+];
+function openDenyPanel(btn){
+  const id = btn.dataset.id, item = btn.closest('.user-item');
+  let panel = item.querySelector('.deny-panel');
+  if(panel){ panel.remove(); return; }
+  const deny = usersCache[id].deny || {};
+  panel = document.createElement('div'); panel.className = 'deny-panel';
+  panel.style.cssText = 'margin-top:10px;padding-top:10px;border-top:1px solid #334155';
+  panel.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;margin-bottom:8px">ติ๊กเมนูที่ต้องการ "ห้ามใช้" สำหรับ ${usersCache[id].name} (มีผลเมื่อเปิดหน้าถัดไป)</div>
+    <div class="perm-grid">${DENY_LIST.map(d=>`<label class="perm-check"><input type="checkbox" data-deny="${d.key}" ${deny[d.key]?'checked':''}> 🚫 ${d.label}</label>`).join('')}</div>
+    <button class="btn small" style="margin-top:8px" data-save>💾 บันทึกสิทธิ์ห้ามใช้</button>`;
+  item.appendChild(panel);
+  panel.querySelector('[data-save]').onclick = ()=>{
+    const o = {}; panel.querySelectorAll('[data-deny]').forEach(c=>{ if(c.checked) o[c.dataset.deny] = true; });
+    db.ref('users/' + id + '/deny').set(Object.keys(o).length ? o : null).then(()=>{ panel.querySelector('[data-save]').textContent = 'บันทึกแล้ว ✓'; });
+  };
 }
 
 function deleteUser(uid, name){
@@ -346,6 +373,33 @@ function addUser(){
     msg.textContent = 'เกิดข้อผิดพลาด: ' + err.message;
   });
 }
+</script>
+<script>
+/* ===== สิทธิ์ห้ามใช้เมนู (deny): ตั้งค่าที่หน้าพนักงาน ===== */
+(function(){
+  var PAGE_KEY = null;
+  var MAP = {"dashboard.html": "dashboard", "sell.html": "sell", "products.html": "products", "stock.html": "stock", "receive.html": "receive", "pricetag.html": "pricetag", "promotions.html": "promotions", "sales.html": "sales", "debtors.html": "debtors", "reports.html": "reports", "addproduct.html": "addproduct", "settings.html": "settings"};
+  var s = null; try{ s = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
+  if(!s || !s.uid || s.role === 'admin') return;
+  try{
+    firebase.database().ref('users/' + s.uid + '/deny').once('value').then(function(sn){
+      var deny = sn.val() || {};
+      window.__deny = deny;
+      if(deny.stockAdjust){ var st = document.createElement('style'); st.textContent = '.adj-btn{display:none !important}'; document.head.appendChild(st); }
+      function hide(){
+        document.querySelectorAll('a[href], [data-href]').forEach(function(el){
+          var h = el.getAttribute('href') || el.getAttribute('data-href'); var k = MAP[h];
+          if(k && deny[k]) el.style.display = 'none';
+        });
+      }
+      hide(); new MutationObserver(hide).observe(document.body, {childList:true, subtree:true});
+      if(PAGE_KEY && deny[PAGE_KEY]){
+        document.body.innerHTML = '<div style="text-align:center;padding:80px 20px;font-family:Sarabun,sans-serif;color:#f1f5f9"><h2>🚫 ไม่มีสิทธิ์ใช้เมนูนี้</h2><p style="color:#94a3b8;margin-top:8px">กำลังกลับหน้าหลัก...</p></div>';
+        setTimeout(function(){ location.href = 'home.html'; }, 1500);
+      }
+    });
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
