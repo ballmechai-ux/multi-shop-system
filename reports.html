@@ -484,15 +484,30 @@ function printCurrentReport(){
 }
 </script>
 <script>
-/* ===== สิทธิ์ห้ามใช้เมนู (deny): ตั้งค่าที่หน้าพนักงาน ===== */
+/* ===== สิทธิ์ใช้เมนูรายหัวข้อ (users/{uid}/menus) — ตั้งค่าที่หน้าพนักงาน ===== */
 (function(){
   var PAGE_KEY = "reports";
   var MAP = {"dashboard.html": "dashboard", "sell.html": "sell", "products.html": "products", "stock.html": "stock", "receive.html": "receive", "pricetag.html": "pricetag", "promotions.html": "promotions", "sales.html": "sales", "debtors.html": "debtors", "reports.html": "reports", "addproduct.html": "addproduct", "settings.html": "settings"};
+  var ALL = ['dashboard','sell','products','stock','stockAdjust','receive','pricetag','promotions','sales','debtors','reports','addproduct','settings'];
   var s = null; try{ s = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
   if(!s || !s.uid || s.role === 'admin') return;
   try{
-    firebase.database().ref('users/' + s.uid + '/deny').once('value').then(function(sn){
-      var deny = sn.val() || {};
+    firebase.database().ref('users/' + s.uid).once('value').then(function(sn){
+      var u = sn.val(); if(!u) return;
+      var menus = u.menus || null, oldDeny = u.deny || {};
+      if(menus){
+        var p = Object.assign({}, u.permissions || {});
+        p.sell = !!menus.sell; p.addProduct = !!(menus.addproduct || menus.receive || menus.pricetag);
+        p.editPrice = !!menus.promotions; p.viewReport = !!(menus.reports || menus.sales); p.manageSystem = !!menus.settings;
+        var need = JSON.stringify(p) !== JSON.stringify(s.permissions || {});
+        if(need && !sessionStorage.getItem('menuSyncDone')){
+          s.permissions = p; localStorage.setItem('shopSession', JSON.stringify(s));
+          sessionStorage.setItem('menuSyncDone', '1'); location.reload(); return;
+        }
+        if(!need) sessionStorage.removeItem('menuSyncDone');
+      }
+      function blocked(k){ return menus ? !menus[k] : !!oldDeny[k]; }
+      var deny = {}; ALL.forEach(function(k){ deny[k] = blocked(k); });
       window.__deny = deny;
       if(deny.stockAdjust){ var st = document.createElement('style'); st.textContent = '.adj-btn{display:none !important}'; document.head.appendChild(st); }
       function hide(){
