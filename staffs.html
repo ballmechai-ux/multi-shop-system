@@ -204,10 +204,10 @@ function renderUserList(){
             บทบาท: ${roleLabel}<br>
             เข้าถึง: ${accessList}<br>
             สิทธิ์: ${permsOn}<br>
-            ห้ามใช้: ${DENY_LIST.filter(d=>u.deny&&u.deny[d.key]).map(d=>d.label).join(', ') || '-'}
+            เมนูที่ใช้ได้: ${u.menus ? (MENU_LIST.filter(d=>u.menus[d.key]).map(d=>d.label).join(', ') || 'ไม่มี') : '(ตามสิทธิ์เดิม — กดปุ่มด้านล่างเพื่อตั้งใหม่)'}
           </div>
           <div class="row-actions">
-            <button class="btn small" data-action="deny" data-id="${id}">🚫 ตั้งสิทธิ์ห้ามใช้เมนู</button>
+            <button class="btn small" data-action="deny" data-id="${id}">🔑 ตั้งสิทธิ์เมนูที่ใช้ได้</button>
             <button class="btn danger small" data-action="del" data-id="${id}">ลบบัญชี</button>
           </div>
         </div>`;
@@ -227,27 +227,36 @@ function renderUserList(){
   });
 }
 
-const DENY_LIST = [
+const MENU_LIST = [
   {key:'dashboard', label:'Dashboard'}, {key:'sell', label:'ขายสินค้า'}, {key:'products', label:'สินค้า'},
-  {key:'stock', label:'สต็อก (ดูข้อมูล)'}, {key:'stockAdjust', label:'ปรับสต็อกโดยตรง (รับสินค้าเข้ายังทำได้)'},
+  {key:'stock', label:'สต็อก (ดูข้อมูล)'}, {key:'stockAdjust', label:'ปรับสต็อกโดยตรง (ไม่ติ๊ก = รับสินค้าเข้าได้อย่างเดียว)'},
   {key:'receive', label:'รับสินค้าเข้า'}, {key:'pricetag', label:'ป้ายราคา'}, {key:'promotions', label:'โปรโมชั่น'},
   {key:'sales', label:'รายการขาย'}, {key:'debtors', label:'ลูกหนี้'}, {key:'reports', label:'รายงาน'},
   {key:'addproduct', label:'เพิ่มสินค้า'}, {key:'settings', label:'ตั้งค่า'}
 ];
+function defaultMenus(u){
+  if(u.menus) return u.menus;
+  const p = u.permissions || {}, d = u.deny || {};
+  const m = { dashboard:true, products:true, stock:true, stockAdjust:true, debtors:true,
+    sell:!!p.sell, receive:!!p.addProduct, pricetag:!!p.addProduct, addproduct:!!p.addProduct,
+    promotions:!!p.editPrice, sales:!!p.viewReport, reports:!!p.viewReport, settings:!!p.manageSystem };
+  Object.keys(d).forEach(k=>{ if(d[k]) m[k] = false; });
+  return m;
+}
 function openDenyPanel(btn){
   const id = btn.dataset.id, item = btn.closest('.user-item');
   let panel = item.querySelector('.deny-panel');
   if(panel){ panel.remove(); return; }
-  const deny = usersCache[id].deny || {};
+  const m = defaultMenus(usersCache[id]);
   panel = document.createElement('div'); panel.className = 'deny-panel';
   panel.style.cssText = 'margin-top:10px;padding-top:10px;border-top:1px solid #334155';
-  panel.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;margin-bottom:8px">ติ๊กเมนูที่ต้องการ "ห้ามใช้" สำหรับ ${usersCache[id].name} (มีผลเมื่อเปิดหน้าถัดไป)</div>
-    <div class="perm-grid">${DENY_LIST.map(d=>`<label class="perm-check"><input type="checkbox" data-deny="${d.key}" ${deny[d.key]?'checked':''}> 🚫 ${d.label}</label>`).join('')}</div>
-    <button class="btn small" style="margin-top:8px" data-save>💾 บันทึกสิทธิ์ห้ามใช้</button>`;
+  panel.innerHTML = `<div style="font-size:12.5px;color:#94a3b8;margin-bottom:8px">ติ๊กเมนูที่ "อนุญาต" ให้ ${usersCache[id].name} ใช้ — เมนูที่ไม่ติ๊กคือห้ามใช้ (มีผลเมื่อเปิดหน้าถัดไป)</div>
+    <div class="perm-grid">${MENU_LIST.map(d=>`<label class="perm-check"><input type="checkbox" data-menu="${d.key}" ${m[d.key]?'checked':''}> ${d.label}</label>`).join('')}</div>
+    <button class="btn small" style="margin-top:8px" data-save>💾 บันทึกสิทธิ์เมนู</button>`;
   item.appendChild(panel);
   panel.querySelector('[data-save]').onclick = ()=>{
-    const o = {}; panel.querySelectorAll('[data-deny]').forEach(c=>{ if(c.checked) o[c.dataset.deny] = true; });
-    db.ref('users/' + id + '/deny').set(Object.keys(o).length ? o : null).then(()=>{ panel.querySelector('[data-save]').textContent = 'บันทึกแล้ว ✓'; });
+    const o = {}; panel.querySelectorAll('[data-menu]').forEach(c=>{ o[c.dataset.menu] = c.checked; });
+    db.ref('users/' + id).update({ menus: o, deny: null }).then(()=>{ panel.querySelector('[data-save]').textContent = 'บันทึกแล้ว ✓'; });
   };
 }
 
@@ -281,10 +290,10 @@ function renderAddForm(){
     <div class="section-label">เข้าถึงร้าน/สาขาไหนได้บ้าง</div>
     <div id="shopTree"></div>
 
-    <div class="section-label">สิทธิ์การใช้งาน</div>
+    <div class="section-label">สิทธิ์ย่อย</div>
     <div class="perm-grid" id="permGrid"></div>
 
-    <div class="section-label" style="margin-top:14px">🚫 ห้ามใช้เมนู (ติ๊กเมนูที่ไม่ให้พนักงานคนนี้ใช้)</div>
+    <div class="section-label" style="margin-top:14px">✅ เมนูที่อนุญาตให้ใช้ (เมนูที่ไม่ติ๊ก = ห้ามใช้)</div>
     <div class="perm-grid" id="denyGrid"></div>
 
     <button class="btn" id="addUserBtn" style="margin-top:10px">เพิ่มพนักงาน</button>
@@ -300,11 +309,11 @@ function renderAddForm(){
     };
   });
 
-  document.getElementById('permGrid').innerHTML = PERMISSIONS.map(p=>
+  document.getElementById('permGrid').innerHTML = PERMISSIONS.filter(p=>['return','viewProfit'].includes(p.key)).map(p=>
     `<label class="perm-check"><input type="checkbox" data-perm="${p.key}"> ${p.label}</label>`
   ).join('');
-  document.getElementById('denyGrid').innerHTML = DENY_LIST.map(d=>
-    `<label class="perm-check"><input type="checkbox" data-deny-new="${d.key}"> 🚫 ${d.label}</label>`
+  document.getElementById('denyGrid').innerHTML = MENU_LIST.map(d=>
+    `<label class="perm-check"><input type="checkbox" data-menu-new="${d.key}"> ${d.label}</label>`
   ).join('');
 
   refreshShopTree();
@@ -366,12 +375,12 @@ function addUser(){
     permissions[cb.dataset.perm] = cb.checked;
   });
 
-  const deny = {};
-  document.querySelectorAll('#denyGrid input[type=checkbox]').forEach(cb=>{ if(cb.checked) deny[cb.dataset.denyNew] = true; });
+  const menus = {};
+  document.querySelectorAll('#denyGrid input[type=checkbox]').forEach(cb=>{ menus[cb.dataset.menuNew] = cb.checked; });
 
   const ref = db.ref('users').push();
   const rec = { name, pin, role: selectedRole, access, permissions, createdAt: Date.now() };
-  if(Object.keys(deny).length) rec.deny = deny;
+  rec.menus = menus;
   ref.set(rec).then(()=>{
     msg.className = 'msg ok';
     msg.textContent = 'เพิ่มพนักงานสำเร็จ';
@@ -384,15 +393,30 @@ function addUser(){
 }
 </script>
 <script>
-/* ===== สิทธิ์ห้ามใช้เมนู (deny): ตั้งค่าที่หน้าพนักงาน ===== */
+/* ===== สิทธิ์ใช้เมนูรายหัวข้อ (users/{uid}/menus) — ตั้งค่าที่หน้าพนักงาน ===== */
 (function(){
   var PAGE_KEY = null;
   var MAP = {"dashboard.html": "dashboard", "sell.html": "sell", "products.html": "products", "stock.html": "stock", "receive.html": "receive", "pricetag.html": "pricetag", "promotions.html": "promotions", "sales.html": "sales", "debtors.html": "debtors", "reports.html": "reports", "addproduct.html": "addproduct", "settings.html": "settings"};
+  var ALL = ['dashboard','sell','products','stock','stockAdjust','receive','pricetag','promotions','sales','debtors','reports','addproduct','settings'];
   var s = null; try{ s = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
   if(!s || !s.uid || s.role === 'admin') return;
   try{
-    firebase.database().ref('users/' + s.uid + '/deny').once('value').then(function(sn){
-      var deny = sn.val() || {};
+    firebase.database().ref('users/' + s.uid).once('value').then(function(sn){
+      var u = sn.val(); if(!u) return;
+      var menus = u.menus || null, oldDeny = u.deny || {};
+      if(menus){
+        var p = Object.assign({}, u.permissions || {});
+        p.sell = !!menus.sell; p.addProduct = !!(menus.addproduct || menus.receive || menus.pricetag);
+        p.editPrice = !!menus.promotions; p.viewReport = !!(menus.reports || menus.sales); p.manageSystem = !!menus.settings;
+        var need = JSON.stringify(p) !== JSON.stringify(s.permissions || {});
+        if(need && !sessionStorage.getItem('menuSyncDone')){
+          s.permissions = p; localStorage.setItem('shopSession', JSON.stringify(s));
+          sessionStorage.setItem('menuSyncDone', '1'); location.reload(); return;
+        }
+        if(!need) sessionStorage.removeItem('menuSyncDone');
+      }
+      function blocked(k){ return menus ? !menus[k] : !!oldDeny[k]; }
+      var deny = {}; ALL.forEach(function(k){ deny[k] = blocked(k); });
       window.__deny = deny;
       if(deny.stockAdjust){ var st = document.createElement('style'); st.textContent = '.adj-btn{display:none !important}'; document.head.appendChild(st); }
       function hide(){
