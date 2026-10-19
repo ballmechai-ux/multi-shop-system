@@ -15,6 +15,8 @@
   @media (min-width:900px){ .wrap{ max-width:900px; } }
   .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
   .topbar h1{ font-family:'Kanit'; font-size:19px; } .back-link{ color:var(--accent); font-size:13px; cursor:pointer; }
+  .logo{ width:46px; height:46px; border-radius:14px; overflow:hidden; background:var(--card); border:1px solid var(--border); display:none; align-items:center; justify-content:center; flex-direction:column; cursor:pointer; color:var(--sub); font-size:18px; flex:none; }
+  .logo img{ width:100%; height:100%; object-fit:cover; } .logo.empty{ border-style:dashed; } .logo small{ font-size:9px; }
   .where{ font-size:13px; color:var(--sub); margin-bottom:14px; }
   .notice{ background:#fbbf2418; border:1px solid #fbbf2455; color:var(--warn); border-radius:12px; padding:9px 12px; font-size:12.5px; margin-bottom:12px; }
   .kpis{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px; }
@@ -65,7 +67,7 @@ function start(){
     { t:'🛒 ขายและออเดอร์', items:[
       { href:'sell.html', ic:'🛒', nm:'ขายเครื่องดื่ม', ds:'เปิดหน้าขาย เลือกเมนู/ขนาด/ท็อปปิ้ง', show: isAdmin || perms.sell },
       { soon:true, ic:'🧾', nm:'รับออเดอร์ + คิวทำ', ds:'คิวเครื่องดื่มที่ต้องทำ' } ] },
-    { t:'🥤 เมนูและสูตร', items:[
+    { t:'📋 เมนูและสูตร', items:[
       { href:'products.html', ic:'📋', nm:'เมนูเครื่องดื่ม', ds:'ดู/ค้นหาเมนูทั้งหมด', show:true },
       { href:'addproduct.html', ic:'➕', nm:'เพิ่มเมนูใหม่', ds:'ตั้งราคา ขนาด ความหวาน ท็อปปิ้ง', show: isAdmin || perms.addProduct },
       { soon:true, ic:'🧪', nm:'สูตรเครื่องดื่ม', ds:'ตัดสต็อกวัตถุดิบตามสูตร' },
@@ -81,8 +83,8 @@ function start(){
       { href:'dashboard.html', ic:'🏠', nm:'Dashboard', ds:'ภาพรวมวันนี้', show:true } ] }
   ];
   app.innerHTML = `
-    <div class="topbar"><h1>🥤 เมนูร้านน้ำปั่น</h1><span class="back-link" onclick="location.href='home.html'">← หน้าหลัก</span></div>
-    <div class="where" id="where">กำลังโหลด...</div>
+    <div class="topbar"><div style="display:flex;align-items:center;gap:10px"><div class="logo" id="logoBox"></div><h1>เมนูร้านน้ำปั่น</h1></div><input type="file" id="logoFile" accept="image/*" hidden><span class="back-link" onclick="location.href='home.html'">← หน้าหลัก</span></div>
+    <div class="where"><span id="whereTxt">กำลังโหลด...</span><span id="rmLogo" class="back-link" style="display:none;margin-left:10px">ลบรูป</span></div>
     <div id="notice"></div>
     <div class="kpis">
       <div class="kpi"><div class="v" id="kSales">-</div><div class="l">ยอดขายวันนี้</div></div>
@@ -98,10 +100,41 @@ function start(){
   const base = `shops/${cb.shopId}/branches/${cb.branchId}`;
   db.ref('shops/' + cb.shopId).once('value').then(sn=>{
     const s = sn.val() || {}, b = (s.branches||{})[cb.branchId] || {};
-    document.getElementById('where').textContent = '📍 ' + ((s.info||{}).name || '') + ' · ' + (b.name || '');
+    document.getElementById('whereTxt').textContent = '📍 ' + ((s.info||{}).name || '') + ' · ' + (b.name || '');
     if((s.info||{}).type && s.info.type !== 'ร้านน้ำปั่น')
       document.getElementById('notice').innerHTML = `<div class="notice">ร้านนี้เป็นประเภท "${esc(s.info.type)}" — เมนูนี้ออกแบบสำหรับร้านน้ำปั่น</div>`;
   });
+  const canEdit = session.role === 'admin' || session.role === 'owner';
+  const logoBox = document.getElementById('logoBox'), logoFile = document.getElementById('logoFile'), rmLogo = document.getElementById('rmLogo');
+  function paintLogo(src){
+    logoBox.classList.toggle('empty', !src);
+    if(src){ logoBox.innerHTML = `<img src="${src}">`; logoBox.style.display = 'flex'; }
+    else if(canEdit){ logoBox.innerHTML = '＋<small>รูป</small>'; logoBox.style.display = 'flex'; }
+    else logoBox.style.display = 'none';
+    rmLogo.style.display = (src && canEdit) ? 'inline' : 'none';
+  }
+  function toLogo(file){
+    return new Promise((res, rej)=>{
+      const img = new Image(), url = URL.createObjectURL(file);
+      img.onload = ()=>{
+        const sc = Math.min(1, 256 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        res(c.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85));
+      };
+      img.onerror = ()=> rej(new Error('อ่านรูปไม่ได้')); img.src = url;
+    });
+  }
+  paintLogo(null);
+  db.ref(base + '/hubConfig/logo').once('value').then(sn=> paintLogo(sn.val()));
+  if(canEdit){
+    logoBox.onclick = ()=> logoFile.click();
+    logoFile.onchange = e=>{
+      const f = e.target.files[0]; if(!f) return;
+      toLogo(f).then(data=> db.ref(base + '/hubConfig/logo').set(data).then(()=> paintLogo(data))).catch(err=> alert('บันทึกรูปไม่สำเร็จ: ' + err.message));
+    };
+    rmLogo.onclick = ()=>{ if(confirm('ลบรูปนี้ออก?')) db.ref(base + '/hubConfig/logo').remove().then(()=> paintLogo(null)); };
+  }
   const t0 = new Date(); t0.setHours(0,0,0,0);
   db.ref(base + '/bills').orderByChild('date').startAt(t0.getTime()).once('value').then(sn=>{
     let sales = 0, n = 0, cups = 0;
