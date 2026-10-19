@@ -263,6 +263,7 @@ function renderMainContent(){
       <input type="date" id="rangeFrom">
       <input type="date" id="rangeTo">
     </div>
+    <input id="billSearch" placeholder="🔍 ค้นหาเลขที่บิล (ค้นหาทุกวัน)" style="width:100%;padding:11px 13px;margin-bottom:10px;border-radius:12px;border:1px solid #334155;background:#0f172a;color:#f1f5f9;font-size:14px">
     <div class="summary-bar" id="summaryBar"></div>
     <div id="billList"></div>
   `;
@@ -272,6 +273,7 @@ function renderMainContent(){
       renderMainContent();
     };
   });
+  document.getElementById('billSearch').oninput = renderBillList;
   if(activeRange === 'custom'){
     document.getElementById('rangeFrom').onchange = renderBillList;
     document.getElementById('rangeTo').onchange = renderBillList;
@@ -317,7 +319,9 @@ function renderBillList(){
   if(!listEl) return;
   const { start, end } = getRangeBounds();
 
+  const sq = ((document.getElementById('billSearch')||{}).value || '').trim().toLowerCase();
   let ids = Object.keys(billsCache).filter(id=>{
+    if(sq) return docNoOf(billsCache[id], id).toLowerCase().includes(sq);
     const d = new Date(billsCache[id].date);
     return d >= start && d <= end;
   });
@@ -341,7 +345,7 @@ function renderBillList(){
     return `<div class="bill-item" data-id="${id}">
       <div class="brow">
         <div>
-          <div class="btime">${time}</div>
+          <div class="btime">${escH(docNoOf(b,id))} · ${time}</div>
           <div class="bmeta">${b.items.length} รายการ · ${methodLabel[b.paymentMethod]||'-'} · ${b.staffName}</div>
           <span class="status-badge ${status}">${statusLabel}</span>
         </div>
@@ -362,6 +366,7 @@ function openBillDetail(billId){
   const sheet = document.getElementById('modalSheet');
   sheet.innerHTML = `
     <h2>รายละเอียดบิล</h2>
+    <div class="detail-line"><span>เลขที่บิล</span><span><b>${escH(docNoOf(b,billId))}</b></span></div>
     ${b.items.map(it=>`<div class="detail-line item"><span>${it.name} x${it.qty}</span><span>฿${(it.price*it.qty - (it.discount||0)).toLocaleString()}</span></div>`).join('')}
     <div class="detail-line"><span>ยอดรวมสินค้า</span><span>฿${b.subtotal.toLocaleString()}</span></div>
     <div class="detail-line"><span>ส่วนลดบิล</span><span>-฿${(b.billDiscount||0).toLocaleString()}</span></div>
@@ -372,12 +377,14 @@ function openBillDetail(billId){
     <div class="detail-line"><span>สถานะ</span><span>${status}</span></div>
     <div class="modal-actions">
       <button class="primary" id="printBillBtn">🖨️ พิมพ์ใบเสร็จ</button>
+      <button id="taxInvBtn">📄 ใบกำกับภาษีเต็มรูป</button>
       ${status==='paid' ? `<button id="returnBillBtn">↩️ คืนสินค้า (คืนทั้งบิล)</button>` : ''}
       ${status!=='cancelled' && status!=='returned' ? `<button class="danger" id="cancelBillBtn">✕ ยกเลิกบิล</button>` : ''}
       <button id="closeBtn">ปิด</button>
     </div>
   `;
-  document.getElementById('printBillBtn').onclick = ()=> printBill(b);
+  document.getElementById('printBillBtn').onclick = ()=> printBill(b, billId);
+  document.getElementById('taxInvBtn').onclick = ()=> printTaxInvoice(b, billId);
   document.getElementById('closeBtn').onclick = closeModal;
   const returnBtn = document.getElementById('returnBillBtn');
   if(returnBtn) returnBtn.onclick = ()=> confirmBillAction(billId, 'return');
@@ -411,31 +418,81 @@ function confirmBillAction(billId, action){
   });
 }
 
-function printBill(b){
-  const methodLabel = {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'};
+function printBill(b, id){
   const area = document.getElementById('printArea');
   area.style.width = shopSettings.paperWidth === '80' ? '300px' : '220px';
-  const shopName = shopSettings.shopName || 'ร้านค้า';
-  const vatLine = shopSettings.taxInvoiceEnabled
-    ? `<div class="pline"><span>VAT ${shopSettings.vatRate ?? 7}%</span><span>฿${(b.total - b.total/(1+((shopSettings.vatRate??7)/100))).toLocaleString(undefined,{maximumFractionDigits:2})}</span></div>`
-    : '';
-  area.innerHTML = `
-    ${shopSettings.logoUrl ? `<img src="${shopSettings.logoUrl}" style="max-width:80px; display:block; margin:0 auto 6px;">` : ''}
-    <h2>${shopName}</h2>
-    ${shopSettings.address ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">${shopSettings.address}</div>` : ''}
-    ${shopSettings.phone ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">โทร. ${shopSettings.phone}</div>` : ''}
-    ${shopSettings.taxId ? `<div style="text-align:center; font-size:10.5px; margin-bottom:8px;">เลขผู้เสียภาษี ${shopSettings.taxId}</div>` : ''}
-    <div style="text-align:center; font-family:'Kanit'; font-weight:bold; margin-bottom:6px;">ใบเสร็จรับเงิน${shopSettings.taxInvoiceEnabled ? ' / ใบกำกับภาษี' : ''}</div>
+  area.innerHTML = receiptHTML(shopSettings, b, id);
+  setTimeout(()=> window.print(), 300);
+}
+
+function printTaxInvoice(b, id){
+  if(!shopSettings.taxId) alert('หมายเหตุ: ยังไม่ได้ตั้งเลขประจำตัวผู้เสียภาษีของร้านในหน้าตั้งค่า');
+  const name = prompt('ชื่อผู้ซื้อ (เว้นว่างได้ — จะเว้นไว้ให้เขียนมือ)'); if(name === null) return;
+  const address = prompt('ที่อยู่ผู้ซื้อ'); if(address === null) return;
+  const taxId = prompt('เลขประจำตัวผู้เสียภาษีของผู้ซื้อ'); if(taxId === null) return;
+  const base = `shops/${currentBranch.shopId}/branches/${currentBranch.branchId}`;
+  db.ref(base + '/invoiceDesign').once('value').then(sn=>{
+    const r = renderInvoiceHTML(sn.val() || {}, shopSettings, b, id, { name, address, taxId });
+    const area = document.getElementById('printArea');
+    area.style.width = r.width; area.innerHTML = r.html;
+    setTimeout(()=> window.print(), 300);
+  });
+}
+
+/* ===== เอกสาร: ใบเสร็จ / ใบกำกับภาษี (ใช้ร่วมกัน) ===== */
+function escH(t){ return String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function thMoney(n){ return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function docNoOf(b, id){ return b.billNo || ('เก่า-' + String(id||'').slice(-6).toUpperCase()); }
+const DEFAULT_DESIGN = { paper:'a4', title:'ใบกำกับภาษี / ใบเสร็จรับเงิน', branchText:'สำนักงานใหญ่', showLogo:true, showAddress:true, showPhone:true, showBranch:true, showUnitPrice:true, showDiscount:true, showSignature:true, showCopyLabel:true, accent:'#1d4ed8', footer:'' };
+
+function receiptHTML(S, b, id){
+  const mL = {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'};
+  const vr = S.vatRate ?? 7;
+  const vatLine = S.taxInvoiceEnabled ? `<div class="pline"><span>VAT ${vr}%</span><span>฿${(b.total - b.total/(1+vr/100)).toLocaleString(undefined,{maximumFractionDigits:2})}</span></div>` : '';
+  return `
+    ${S.logoUrl ? `<img src="${escH(S.logoUrl)}" style="max-width:80px; display:block; margin:0 auto 6px;">` : ''}
+    <h2>${escH(S.shopName||'ร้านค้า')}</h2>
+    ${S.address ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">${escH(S.address)}</div>` : ''}
+    ${S.phone ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">โทร. ${escH(S.phone)}</div>` : ''}
+    ${S.taxId ? `<div style="text-align:center; font-size:10.5px; margin-bottom:8px;">เลขผู้เสียภาษี ${escH(S.taxId)}</div>` : ''}
+    <div style="text-align:center; font-family:'Kanit'; font-weight:bold; margin-bottom:6px;">ใบเสร็จรับเงิน${S.taxInvoiceEnabled ? ' / ใบกำกับภาษี' : ''}</div>
+    <div class="pline"><span>เลขที่บิล</span><span><b>${escH(docNoOf(b,id))}</b></span></div>
     <div class="pline"><span>วันที่</span><span>${new Date(b.date).toLocaleString('th-TH')}</span></div>
-    <div class="pline"><span>พนักงาน</span><span>${b.staffName}</span></div>
+    <div class="pline"><span>พนักงาน</span><span>${escH(b.staffName)}</span></div>
     <div style="margin:8px 0; border-top:1px dashed #000;"></div>
-    ${b.items.map(it=>`<div class="pline"><span>${it.name} x${it.qty}</span><span>฿${(it.price*it.qty-(it.discount||0)).toLocaleString()}</span></div>`).join('')}
+    ${(b.items||[]).map(it=>`<div class="pline"><span>${escH(it.name)} x${it.qty}</span><span>฿${(it.price*it.qty-(it.discount||0)).toLocaleString()}</span></div>`).join('')}
     <div class="pline ptotal"><span>ยอดสุทธิ</span><span>฿${b.total.toLocaleString()}</span></div>
     ${vatLine}
-    <div class="pline"><span>ชำระโดย</span><span>${methodLabel[b.paymentMethod]||'-'}</span></div>
-    ${shopSettings.receiptFooter ? `<div style="text-align:center; font-size:10.5px; margin-top:10px; border-top:1px dashed #000; padding-top:6px;">${shopSettings.receiptFooter}</div>` : ''}
-  `;
-  setTimeout(()=> window.print(), 300);
+    <div class="pline"><span>ชำระโดย</span><span>${mL[b.paymentMethod]||'-'}</span></div>
+    ${S.receiptFooter ? `<div style="text-align:center; font-size:10.5px; margin-top:10px; border-top:1px dashed #000; padding-top:6px;">${escH(S.receiptFooter)}</div>` : ''}`;
+}
+
+function renderInvoiceHTML(D, S, b, id, buyer){
+  D = Object.assign({}, DEFAULT_DESIGN, D || {}); buyer = buyer || {}; S = S || {};
+  const slip = D.paper !== 'a4';
+  const width = D.paper === 'a4' ? '700px' : (D.paper === '80' ? '300px' : '220px');
+  const vr = Number(S.vatRate ?? 7) || 0;
+  const total = Number(b.total) || 0, base = total/(1+vr/100), vat = total - base;
+  const col = D.accent || '#1d4ed8', fs = slip ? 11 : 13;
+  const dots = '................................';
+  const head = `<div style="text-align:center">${D.showLogo && S.logoUrl ? `<img src="${escH(S.logoUrl)}" style="max-height:${slip?50:70}px;margin-bottom:4px"><br>` : ''}
+    <b style="font-size:${slip?14:18}px;font-family:Kanit">${escH(S.shopName||'ร้านค้า')}</b>
+    ${D.showAddress && S.address ? `<div>${escH(S.address)}</div>` : ''}${D.showPhone && S.phone ? `<div>โทร. ${escH(S.phone)}</div>` : ''}
+    <div>เลขประจำตัวผู้เสียภาษี ${escH(S.taxId||'-')}${D.showBranch && D.branchText ? ' · ' + escH(D.branchText) : ''}</div></div>`;
+  const title = `<div style="margin:8px 0;padding:6px;background:${col};color:#fff;text-align:center;font-family:Kanit;font-size:${slip?13:16}px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${escH(D.title)}${D.showCopyLabel ? ' (ต้นฉบับ)' : ''}</div>`;
+  const meta = `<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px"><span>เลขที่ <b>${escH(docNoOf(b,id))}</b></span><span>วันที่ ${new Date(b.date).toLocaleString('th-TH')}</span></div>`;
+  const buyerBox = `<div style="border:1px solid #999;padding:6px;margin:6px 0"><div>ผู้ซื้อ: ${buyer.name ? escH(buyer.name) : dots}</div><div>ที่อยู่: ${buyer.address ? escH(buyer.address) : dots}</div><div>เลขประจำตัวผู้เสียภาษี: ${buyer.taxId ? escH(buyer.taxId) : dots}</div></div>`;
+  const showUnit = !slip && D.showUnitPrice, showDisc = !slip && D.showDiscount;
+  const rows = (b.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${escH(it.name)}</td><td style="text-align:right">${it.qty}</td>${showUnit?`<td style="text-align:right">${thMoney(it.price)}</td>`:''}${showDisc?`<td style="text-align:right">${thMoney(it.discount||0)}</td>`:''}<td style="text-align:right">${thMoney(it.price*it.qty-(it.discount||0))}</td></tr>`).join('');
+  const table = `<style>.inv td,.inv th{border-bottom:1px solid #ddd;padding:3px}</style><table class="inv" style="width:100%;border-collapse:collapse;font-size:${fs}px"><tr style="background:#eee"><th>#</th><th style="text-align:left">รายการ</th><th>จำนวน</th>${showUnit?'<th>ราคา/หน่วย</th>':''}${showDisc?'<th>ส่วนลด</th>':''}<th>รวม</th></tr>${rows}</table>`;
+  const r2 = (l,v)=>`<div style="display:flex;justify-content:space-between"><span>${l}</span><span>${v}</span></div>`;
+  const bd = Number(b.billDiscount) || 0;
+  const totals = `<div style="margin-top:8px;margin-left:auto;width:${slip?'100%':'55%'}">${bd?r2('ส่วนลดบิล','-'+thMoney(bd)):''}${r2('มูลค่าสินค้า (ก่อนภาษี)',thMoney(base))}${r2('ภาษีมูลค่าเพิ่ม '+vr+'%',thMoney(vat))}
+    <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:${fs+3}px;border-top:2px solid #000;margin-top:4px;padding-top:4px"><span>รวมทั้งสิ้น</span><span>${thMoney(total)}</span></div>
+    <div style="font-size:${fs-2}px;color:#555">ราคารวมภาษีมูลค่าเพิ่มแล้ว</div></div>`;
+  const sign = D.showSignature ? `<div style="display:flex;justify-content:space-around;margin-top:${slip?16:36}px;text-align:center;font-size:${fs}px"><div>..............................<br>ผู้รับเงิน</div><div>..............................<br>ผู้ซื้อ</div></div>` : '';
+  const foot = D.footer ? `<div style="text-align:center;font-size:${fs-1}px;margin-top:10px;border-top:1px dashed #000;padding-top:6px">${escH(D.footer)}</div>` : '';
+  return { width, html: `<div style="font-family:Sarabun,sans-serif;font-size:${fs}px;color:#000;background:#fff">${head}${title}${meta}${buyerBox}${table}${totals}${sign}${foot}</div>` };
 }
 
 function closeModal(){
