@@ -226,6 +226,7 @@ function renderActionStep(){
     ? `<span class="back-link" id="backToBranch">← เปลี่ยนสาขา</span>`
     : `<span class="back-link" id="backToShop2">← เปลี่ยนร้าน</span>`;
 
+  if(shop.info && shop.info.type === 'ร้านน้ำปั่น'){ location.replace('drinkshop.html'); return; }
   const actions = [
     { href:'drinkshop.html', icon:'🥤', label:'เมนูร้านน้ำปั่น', show: (shop.info && shop.info.type === 'ร้านน้ำปั่น') },
     { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
@@ -257,7 +258,9 @@ function renderActionStep(){
     render();
   };
 
-  document.getElementById('actionList').innerHTML = actions.filter(a=>a.show).map(a=>
+  const drinkOnly = shop.info && shop.info.type === 'ร้านน้ำปั่น';
+  const SYS_ONLY = ['drinkshop.html','shops.html','staffs.html','settings.html','invoice.html','cleanup.html'];
+  document.getElementById('actionList').innerHTML = actions.filter(a=> a.show && (!drinkOnly || SYS_ONLY.includes(a.href))).map(a=>
     `<div class="action-card" data-href="${a.href}">
       <div class="icon">${a.icon}</div>
       <div class="info"><div class="aname">${a.label}</div></div>
