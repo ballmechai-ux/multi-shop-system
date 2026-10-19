@@ -174,7 +174,7 @@ function render(){
       </div>
 
       <button class="btn" id="saveBtn">💾 บันทึก + พิมพ์ใบหนี้</button>
-      <button class="btn outline" onclick="location.href='sell.html'">ยกเลิก กลับไปหน้าขาย</button>
+      <button class="btn outline" onclick="location.href=(sale && sale.returnTo) || 'sell.html'">ยกเลิก กลับไปหน้าขาย</button>
       <div class="msg" id="saveMsg"></div>
     </div>
   `;
@@ -376,7 +376,7 @@ function showSuccess(debt){
           <div class="bill-line grand"><span>ยอดค้างชำระ</span><span>฿${debt.total.toLocaleString()}</span></div>
         </div>
         <button class="btn" onclick="window.print()">🖨️ พิมพ์ใบหนี้อีกครั้ง</button>
-        <button class="btn outline" onclick="location.href='sell.html'">🛒 ขายรายการถัดไป</button>
+        <button class="btn outline" onclick="location.href=(sale && sale.returnTo) || 'sell.html'">🛒 ขายรายการถัดไป</button>
       </div>
     </div>
   `;

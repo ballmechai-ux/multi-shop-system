@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ขายเครื่องดื่ม</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{ --bg:#f0fdfa; --card:#ffffff; --ink:#134e4a; --sub:#5f8a85; --line:#cdeae6; --main:#0d9488; --main2:#14b8a6; --price:#ea580c; --danger:#dc2626; }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  body{ font-family:'Sarabun',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; padding:12px; padding-bottom:96px; }
+  .wrap{ max-width:1000px; margin:0 auto; }
+  .top{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .top .logo{ width:40px; height:40px; border-radius:12px; object-fit:cover; display:none; }
+  .top h1{ font-family:'Kanit'; font-size:19px; flex:1; }
+  .top a{ color:var(--main); font-size:13px; text-decoration:none; cursor:pointer; }
+  #q{ width:100%; padding:12px 14px; border-radius:14px; border:2px solid var(--line); background:#fff; font-size:15px; font-family:'Sarabun'; color:var(--ink); margin-bottom:12px; }
+  #q:focus{ outline:none; border-color:var(--main2); }
+  .cats{ display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:10px; margin-bottom:14px; }
+  .cat{ position:relative; background:var(--card); border:2px solid var(--line); border-radius:18px; overflow:hidden; cursor:pointer; text-align:center; }
+  .cat.active{ border-color:var(--main); box-shadow:0 0 0 3px #0d948833; }
+  .cat .ci{ width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
+  .cat .cf{ width:100%; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; font-family:'Kanit'; font-size:34px; color:#fff; background:linear-gradient(135deg,var(--main2),#2dd4bf); }
+  .cat .cn{ font-family:'Kanit'; font-size:13px; padding:6px 4px; }
+  .cat.active .cn{ background:var(--main); color:#fff; }
+  .cat .cam{ position:absolute; top:4px; right:4px; background:#000a; color:#fff; border-radius:10px; font-size:12px; padding:2px 6px; }
+  .cat .del{ position:absolute; top:4px; left:4px; background:#000a; color:#fff; border-radius:10px; font-size:12px; padding:2px 6px; }
+  .menu{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+  @media (min-width:700px){ .menu{ grid-template-columns:repeat(4,1fr); } }
+  .item{ background:var(--card); border:2px solid var(--line); border-radius:20px; overflow:hidden; cursor:pointer; }
+  .item:active{ transform:scale(.98); border-color:var(--main2); }
+  .item .im{ width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:#e6f7f4; }
+  .item .fb{ width:100%; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; font-family:'Kanit'; font-size:44px; color:#fff; background:linear-gradient(135deg,#2dd4bf,var(--main)); }
+  .item .nm{ font-family:'Kanit'; font-size:14.5px; padding:8px 10px 2px; line-height:1.25; min-height:40px; }
+  .item .pr{ padding:0 10px 10px; font-family:'Kanit'; font-size:18px; color:var(--price); }
+  .item .pr s{ color:#94a3b8; font-size:12px; margin-right:6px; }
+  .item .pr b{ font-size:10.5px; background:#ffedd5; color:var(--price); border-radius:8px; padding:1px 7px; margin-left:6px; font-weight:500; }
+  .empty{ text-align:center; color:var(--sub); padding:40px 10px; grid-column:1/-1; }
+  .bar{ position:fixed; left:0; right:0; bottom:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:#fff; border-top:2px solid var(--line); z-index:20; }
+  .bar button{ width:100%; max-width:1000px; display:flex; margin:0 auto; justify-content:space-between; align-items:center; padding:14px 18px; border:none; border-radius:16px; background:var(--main); color:#fff; font-family:'Kanit'; font-size:16px; cursor:pointer; }
+  .bar button:disabled{ background:#99c9c3; }
+  .ov{ position:fixed; inset:0; background:#0007; z-index:50; display:flex; align-items:flex-end; justify-content:center; }
+  .sheet{ background:#fff; width:100%; max-width:560px; max-height:88vh; overflow:auto; border-radius:24px 24px 0 0; padding:18px; }
+  .sheet h2{ font-family:'Kanit'; font-size:17px; margin-bottom:10px; }
+  .opt-title{ font-family:'Kanit'; font-size:13.5px; margin:10px 0 6px; color:var(--sub); }
+  .opt{ display:flex; align-items:center; gap:10px; padding:11px 12px; border:2px solid var(--line); border-radius:14px; margin-bottom:6px; font-size:14.5px; }
+  .opt input{ width:20px; height:20px; accent-color:var(--main); }
+  .btn{ width:100%; padding:14px; border:none; border-radius:16px; background:var(--main); color:#fff; font-family:'Kanit'; font-size:16px; cursor:pointer; margin-top:10px; }
+  .btn.out{ background:#fff; color:var(--sub); border:2px solid var(--line); }
+  .line{ display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .line .ln{ flex:1; font-size:14px; } .line .lp{ font-family:'Kanit'; color:var(--price); }
+  .qb{ width:32px; height:32px; border-radius:50%; border:2px solid var(--line); background:#fff; font-size:18px; color:var(--main); cursor:pointer; }
+  .sum{ display:flex; justify-content:space-between; font-size:14px; padding:5px 0; }
+  .sum.g{ font-family:'Kanit'; font-size:20px; color:var(--price); }
+  .sheet input[type=number]{ width:110px; padding:8px; border:2px solid var(--line); border-radius:10px; font-size:14px; text-align:right; }
+  .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div id="ovHost"></div>
+<div class="bar" id="bar" style="display:none"></div>
+<input type="file" id="catFile" accept="image/*" hidden>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+let session = null, cb = null;
+try{ session = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
+try{ cb = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+const esc = t => String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fm = n => '฿' + (Number(n)||0).toLocaleString(undefined,{maximumFractionDigits:2});
+function encKey(k){ return btoa(unescape(encodeURIComponent(k))).replace(/[+/=]/g, c=>({'+':'-','/':'_','=':''}[c])); }
+
+let products = {}, promos = {}, hub = { logo:null, cats:{} };
+let cart = {}, activeCat = 'ทั้งหมด', query = '', billDiscount = 0;
+const canEdit = session && (session.role === 'admin' || session.role === 'owner');
+
+if(!session){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#0d9488">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(session.role !== 'admin' && !(session.permissions||{}).sell){
+  app.innerHTML = `<div class="blocked"><h1>ไม่มีสิทธิ์ขายสินค้า</h1><br><a href="home.html" style="color:#0d9488">กลับหน้าหลัก</a></div>`;
+} else if(!cb || !cb.shopId || !cb.branchId){
+  app.innerHTML = `<div class="blocked"><h1>ยังไม่ได้เลือกสาขา</h1><br><a href="home.html" style="color:#0d9488">ไปหน้าหลักเพื่อเลือกสาขา</a></div>`;
+} else { boot(); }
+
+function BASE(){ return `shops/${cb.shopId}/branches/${cb.branchId}`; }
+function boot(){
+  app.innerHTML = `
+    <div class="top"><img class="logo" id="logo"><h1>ขายเครื่องดื่ม</h1><a href="drinkshop.html">← เมนูร้านน้ำ</a></div>
+    <input id="q" placeholder="🔍 ค้นหาเมนู">
+    <div class="cats" id="cats"></div>
+    <div class="menu" id="menu"></div>`;
+  document.getElementById('q').oninput = e=>{ query = e.target.value.trim().toLowerCase(); renderMenu(); };
+  db.ref(BASE()+'/products').on('value', sn=>{ products = sn.val() || {}; renderCats(); renderMenu(); });
+  db.ref(BASE()+'/promotions').on('value', sn=>{ promos = sn.val() || {}; renderMenu(); });
+  db.ref(BASE()+'/hubConfig').on('value', sn=>{
+    const v = sn.val() || {}; hub = { logo:v.logo || null, cats:v.catImages || {} };
+    const lg = document.getElementById('logo'); if(hub.logo){ lg.src = hub.logo; lg.style.display = 'block'; } else lg.style.display = 'none';
+    renderCats();
+  });
+  renderBar();
+}
+
+function promoPrice(id){
+  const pid = Object.keys(promos).find(k=> promos[k].productId === id && promos[k].active !== false);
+  if(!pid) return null; return (products[id].sellPrice||0) * (1 - promos[pid].discountPercent/100);
+}
+function categories(){ return [...new Set(Object.values(products).map(p=>p.category).filter(Boolean))]; }
+function firstImg(cat){ const p = Object.values(products).find(x=> x.category === cat && x.image); return p ? p.image : null; }
+
+function renderCats(){
+  const el = document.getElementById('cats'); if(!el) return;
+  const list = ['ทั้งหมด', ...categories()];
+  el.innerHTML = list.map(c=>{
+    const img = c === 'ทั้งหมด' ? null : (hub.cats[encKey(c)] || firstImg(c));
+    const custom = c !== 'ทั้งหมด' && hub.cats[encKey(c)];
+    return `<div class="cat ${c===activeCat?'active':''}" data-c="${esc(c)}">
+      ${img ? `<img class="ci" src="${esc(img)}">` : `<div class="cf">${c==='ทั้งหมด'?'★':esc(c.charAt(0))}</div>`}
+      ${canEdit && c!=='ทั้งหมด' ? `<span class="cam" data-cam="${esc(c)}">📷</span>${custom?`<span class="del" data-del="${esc(c)}">✕</span>`:''}` : ''}
+      <div class="cn">${esc(c)}</div></div>`;
+  }).join('');
+  el.onclick = e=>{
+    const cam = e.target.dataset.cam, del = e.target.dataset.del;
+    if(cam){ pickCatImage(cam); return; }
+    if(del){ if(confirm('ลบรูปหมวดนี้? (จะใช้รูปเมนูแรกของหมวดแทน)')) db.ref(BASE()+'/hubConfig/catImages/'+encKey(del)).remove(); return; }
+    const c = e.target.closest('.cat'); if(c){ activeCat = c.dataset.c; renderCats(); renderMenu(); }
+  };
+}
+function pickCatImage(cat){
+  const f = document.getElementById('catFile'); f.value = '';
+  f.onchange = ()=>{ const file = f.files[0]; if(!file) return;
+    toImg(file, 300).then(d=> db.ref(BASE()+'/hubConfig/catImages/'+encKey(cat)).set(d)).catch(err=> alert('บันทึกรูปไม่สำเร็จ: '+err.message)); };
+  f.click();
+}
+function toImg(file, max){
+  return new Promise((res, rej)=>{
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = ()=>{ const sc = Math.min(1, max/Math.max(img.width,img.height)); const c = document.createElement('canvas');
+      c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc); c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg', 0.8)); };
+    img.onerror = ()=> rej(new Error('อ่านรูปไม่ได้')); img.src = url;
+  });
+}
+
+function renderMenu(){
+  const el = document.getElementById('menu'); if(!el) return;
+  const ids = Object.keys(products).filter(id=>{
+    const p = products[id];
+    if(activeCat !== 'ทั้งหมด' && p.category !== activeCat) return false;
+    if(query && !((p.name||'').toLowerCase().includes(query) || (p.barcode||'').toLowerCase().includes(query))) return false;
+    return true;
+  }).sort((a,b)=> (products[a].name||'').localeCompare(products[b].name||'', 'th'));
+  el.innerHTML = ids.length ? ids.map(id=>{
+    const p = products[id], pp = promoPrice(id);
+    return `<div class="item" data-id="${id}">
+      ${p.image ? `<img class="im" src="${esc(p.image)}" onerror="this.outerHTML='<div class=&quot;fb&quot;>${esc((p.name||'?').charAt(0))}</div>'">` : `<div class="fb">${esc((p.name||'?').charAt(0))}</div>`}
+      <div class="nm">${esc(p.name)}</div>
+      <div class="pr">${pp!=null ? `<s>${fm(p.sellPrice)}</s>${fm(pp)}<b>โปร</b>` : fm(p.sellPrice)}</div></div>`;
+  }).join('') : `<div class="empty">ไม่พบเมนู</div>`;
+  el.onclick = e=>{ const it = e.target.closest('.item'); if(it) addToCart(it.dataset.id); };
+}
+
+function groupsOf(p){
+  if(p.optionGroups && p.optionGroups.length) return p.optionGroups;
+  const g = [];
+  if(p.sizeOptions && p.sizeOptions.length) g.push({ name:'ขนาด', type:'single', choices:p.sizeOptions });
+  if(p.addOnOptions && p.addOnOptions.length) g.push({ name:'ตัวเลือกเสริม', type:'multi', choices:p.addOnOptions });
+  return g;
+}
+function addToCart(id){
+  const p = products[id]; if(!p) return;
+  const base = promoPrice(id) ?? (p.sellPrice||0), groups = groupsOf(p);
+  if(groups.length) openOptions(id, groups, base); else addLine(id, id, p.name, base);
+}
+function addLine(pid, key, name, price){
+  if(cart[key]) cart[key].qty++; else cart[key] = { productId:pid, name, price, qty:1, discount:0, unit:products[pid].unit||'' };
+  renderBar();
+}
+function closeOv(){ document.getElementById('ovHost').innerHTML = ''; }
+function openOptions(id, groups, base){
+  const p = products[id];
+  document.getElementById('ovHost').innerHTML = `<div class="ov" id="ov"><div class="sheet">
+    <h2>${esc(p.name)}</h2>
+    ${groups.map((g,gi)=>`<div class="opt-title">${esc(g.name)}${g.type==='single'?' (เลือก 1)':' (เลือกได้หลายอย่าง)'}</div>
+      ${g.choices.map((c,ci)=>`<label class="opt"><input type="${g.type==='single'?'radio':'checkbox'}" name="g${gi}" value="${ci}" ${g.type==='single'&&ci===0?'checked':''}>
+        <span style="flex:1">${esc(c.name)}</span><span>${c.delta?(c.delta>0?'+':'')+c.delta.toLocaleString():''}</span></label>`).join('')}`).join('')}
+    <div class="sum g"><span>ราคา</span><span id="op">${fm(base)}</span></div>
+    <button class="btn" id="okBtn">เพิ่มลงตะกร้า</button><button class="btn out" id="noBtn">ยกเลิก</button></div></div>`;
+  const ov = document.getElementById('ov');
+  const calc = ()=>{
+    let price = base; const labels = [];
+    groups.forEach((g,gi)=> ov.querySelectorAll(`input[name="g${gi}"]:checked`).forEach(x=>{ const c = g.choices[+x.value]; price += c.delta||0; labels.push(c.name); }));
+    document.getElementById('op').textContent = fm(price); return { price, labels };
+  };
+  ov.querySelectorAll('input').forEach(x=> x.onchange = calc);
+  ov.onclick = e=>{ if(e.target.id === 'ov') closeOv(); };
+  document.getElementById('noBtn').onclick = closeOv;
+  document.getElementById('okBtn').onclick = ()=>{
+    const { price, labels } = calc();
+    addLine(id, id + '|' + labels.join(','), p.name + (labels.length ? ` (${labels.join(', ')})` : ''), price); closeOv();
+  };
+}
+
+function totals(){
+  const ids = Object.keys(cart);
+  const cups = ids.reduce((a,k)=>a+cart[k].qty,0);
+  const sub = ids.reduce((a,k)=>a+cart[k].price*cart[k].qty-(cart[k].discount||0),0);
+  return { ids, cups, sub, grand: Math.max(0, sub - billDiscount) };
+}
+function renderBar(){
+  const bar = document.getElementById('bar'), t = totals();
+  bar.style.display = 'block';
+  bar.innerHTML = `<button id="cartBtn" ${t.cups?'':'disabled'}><span>🛒 ${t.cups} แก้ว</span><span>${fm(t.grand)} · ดูตะกร้า ▸</span></button>`;
+  document.getElementById('cartBtn').onclick = openCart;
+}
+function openCart(){
+  const t = totals();
+  document.getElementById('ovHost').innerHTML = `<div class="ov" id="ov"><div class="sheet">
+    <h2>🛒 ตะกร้า (${t.cups} แก้ว)</h2>
+    ${t.ids.map(k=>`<div class="line"><div class="ln">${esc(cart[k].name)}<br><span style="color:var(--sub);font-size:12px">${fm(cart[k].price)}</span></div>
+      <button class="qb" data-m="${esc(k)}">−</button><b>${cart[k].qty}</b><button class="qb" data-p="${esc(k)}">+</button>
+      <div class="lp">${fm(cart[k].price*cart[k].qty)}</div></div>`).join('')}
+    <div class="sum" style="margin-top:8px"><span>ส่วนลดทั้งบิล (บาท)</span><input type="number" id="bd" min="0" value="${billDiscount||''}" placeholder="0"></div>
+    <div class="sum"><span>ยอดรวม</span><span>${fm(t.sub)}</span></div>
+    <div class="sum g"><span>ยอดสุทธิ</span><span>${fm(t.grand)}</span></div>
+    <button class="btn" id="payBtn">ไปชำระเงิน</button><button class="btn out" id="bk">เลือกเมนูเพิ่ม</button></div></div>`;
+  const ov = document.getElementById('ov');
+  ov.onclick = e=>{
+    if(e.target.id === 'ov'){ closeOv(); return; }
+    const m = e.target.dataset.m, p = e.target.dataset.p;
+    if(m){ if(--cart[m].qty <= 0) delete cart[m]; renderBar(); Object.keys(cart).length ? openCart() : closeOv(); }
+    if(p){ cart[p].qty++; renderBar(); openCart(); }
+  };
+  document.getElementById('bd').oninput = e=>{ billDiscount = Math.max(0, parseFloat(e.target.value)||0); renderBar(); };
+  document.getElementById('bd').onchange = openCart;
+  document.getElementById('bk').onclick = closeOv;
+  document.getElementById('payBtn').onclick = ()=>{
+    const t2 = totals(); if(!t2.ids.length) return;
+    const items = t2.ids.map(k=>({ productId:cart[k].productId, name:cart[k].name, price:cart[k].price, qty:cart[k].qty, discount:cart[k].discount||0, unit:cart[k].unit }));
+    localStorage.setItem('pendingSale', JSON.stringify({ shopId:cb.shopId, branchId:cb.branchId, items, subtotal:t2.sub, billDiscount, grandTotal:t2.grand, returnTo:'drinksell.html' }));
+    location.href = 'pay.html';
+  };
+}
+</script>
+<script>
+/* ===== สิทธิ์ใช้เมนูรายหัวข้อ (users/{uid}/menus) — ตั้งค่าที่หน้าพนักงาน ===== */
+(function(){
+  var PAGE_KEY = "sell";
+  var MAP = {"dashboard.html": "dashboard", "sell.html": "sell", "products.html": "products", "stock.html": "stock", "receive.html": "receive", "pricetag.html": "pricetag", "promotions.html": "promotions", "sales.html": "sales", "debtors.html": "debtors", "reports.html": "reports", "addproduct.html": "addproduct", "settings.html": "settings"};
+  var ALL = ['dashboard','sell','products','stock','stockAdjust','receive','pricetag','promotions','sales','debtors','reports','addproduct','settings'];
+  var s = null; try{ s = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
+  if(!s || !s.uid || s.role === 'admin') return;
+  try{
+    firebase.database().ref('users/' + s.uid).once('value').then(function(sn){
+      var u = sn.val(); if(!u) return;
+      var menus = u.menus || null, oldDeny = u.deny || {};
+      if(menus){
+        var p = Object.assign({}, u.permissions || {});
+        p.sell = !!menus.sell; p.addProduct = !!(menus.addproduct || menus.receive || menus.pricetag);
+        p.editPrice = !!menus.promotions; p.viewReport = !!(menus.reports || menus.sales); p.manageSystem = !!menus.settings;
+        var need = JSON.stringify(p) !== JSON.stringify(s.permissions || {});
+        if(need && !sessionStorage.getItem('menuSyncDone')){
+          s.permissions = p; localStorage.setItem('shopSession', JSON.stringify(s));
+          sessionStorage.setItem('menuSyncDone', '1'); location.reload(); return;
+        }
+        if(!need) sessionStorage.removeItem('menuSyncDone');
+      }
+      function blocked(k){ return menus ? !menus[k] : !!oldDeny[k]; }
+      var deny = {}; ALL.forEach(function(k){ deny[k] = blocked(k); });
+      window.__deny = deny;
+      if(deny.stockAdjust){ var st = document.createElement('style'); st.textContent = '.adj-btn{display:none !important}'; document.head.appendChild(st); }
+      function hide(){
+        document.querySelectorAll('a[href], [data-href]').forEach(function(el){
+          var h = el.getAttribute('href') || el.getAttribute('data-href'); var k = MAP[h];
+          if(k && deny[k]) el.style.display = 'none';
+        });
+      }
+      hide(); new MutationObserver(hide).observe(document.body, {childList:true, subtree:true});
+      if(PAGE_KEY && deny[PAGE_KEY]){
+        document.body.innerHTML = '<div style="text-align:center;padding:80px 20px;font-family:Sarabun,sans-serif;color:#f1f5f9"><h2>🚫 ไม่มีสิทธิ์ใช้เมนูนี้</h2><p style="color:#94a3b8;margin-top:8px">กำลังกลับหน้าหลัก...</p></div>';
+        setTimeout(function(){ location.href = 'home.html'; }, 1500);
+      }
+    });
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

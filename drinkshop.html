@@ -65,7 +65,7 @@ function start(){
   const isAdmin = session.role === 'admin', perms = session.permissions || {};
   const SEC = [
     { t:'🛒 ขายและออเดอร์', items:[
-      { href:'sell.html', ic:'🛒', nm:'ขายเครื่องดื่ม', ds:'เปิดหน้าขาย เลือกเมนู/ขนาด/ท็อปปิ้ง', show: isAdmin || perms.sell },
+      { href:'drinksell.html', ic:'🛒', nm:'ขายเครื่องดื่ม', ds:'เมนูปุ่มใหญ่ มีรูป เลือกหมวดได้', show: isAdmin || perms.sell },
       { soon:true, ic:'🧾', nm:'รับออเดอร์ + คิวทำ', ds:'คิวเครื่องดื่มที่ต้องทำ' } ] },
     { t:'📋 เมนูและสูตร', items:[
       { href:'products.html', ic:'📋', nm:'เมนูเครื่องดื่ม', ds:'ดู/ค้นหาเมนูทั้งหมด', show:true },
@@ -155,7 +155,7 @@ function start(){
 /* ===== สิทธิ์ใช้เมนูรายหัวข้อ (users/{uid}/menus) — ตั้งค่าที่หน้าพนักงาน ===== */
 (function(){
   var PAGE_KEY = null;
-  var MAP = {"dashboard.html": "dashboard", "sell.html": "sell", "products.html": "products", "stock.html": "stock", "receive.html": "receive", "pricetag.html": "pricetag", "promotions.html": "promotions", "sales.html": "sales", "debtors.html": "debtors", "reports.html": "reports", "addproduct.html": "addproduct", "settings.html": "settings"};
+  var MAP = {"dashboard.html": "dashboard", "sell.html": "sell", "drinksell.html": "sell", "products.html": "products", "stock.html": "stock", "receive.html": "receive", "pricetag.html": "pricetag", "promotions.html": "promotions", "sales.html": "sales", "debtors.html": "debtors", "reports.html": "reports", "addproduct.html": "addproduct", "settings.html": "settings"};
   var ALL = ['dashboard','sell','products','stock','stockAdjust','receive','pricetag','promotions','sales','debtors','reports','addproduct','settings'];
   var s = null; try{ s = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
   if(!s || !s.uid || s.role === 'admin') return;

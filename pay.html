@@ -68,11 +68,17 @@
   .empty-note{ text-align:center; color:var(--sub); font-size:13px; padding:40px 20px; }
   .blocked{ text-align:center; padding:60px 20px; color:var(--sub); }
   .blocked h1{ font-family:'Kanit'; color:var(--text); font-size:20px; margin-bottom:10px; }
+  #printArea{ position:absolute; left:-9999px; top:0; width:220px; background:#fff; color:#000; padding:12px; font-family:'Sarabun'; }
+  #printArea h2{ font-family:'Kanit'; text-align:center; font-size:16px; margin-bottom:6px; }
+  #printArea .pline{ display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
+  #printArea .ptotal{ font-weight:bold; font-size:14px; border-top:1px solid #000; margin-top:6px; padding-top:6px; }
+  @media print{ body *{ visibility:hidden; } #printArea, #printArea *{ visibility:visible; } #printArea{ position:absolute; left:0; top:0; } }
   .success-screen{ text-align:center; padding:30px 10px; }
   .success-icon{ font-size:48px; margin-bottom:10px; }
 </style>
 </head>
 <body>
+<div id="printArea"></div>
 <div id="app"><div class="blocked">กำลังโหลด...</div></div>
 
 <script>
@@ -115,7 +121,7 @@ function render(){
     <div class="wrap">
       <div class="topbar">
         <h1>💰 ชำระเงิน</h1>
-        <span class="back-link" onclick="location.href='sell.html'">← กลับไปแก้บิล</span>
+        <span class="back-link" onclick="location.href=(sale && sale.returnTo) || 'sell.html'">← กลับไปแก้บิล</span>
       </div>
 
       <div class="card">
@@ -219,7 +225,10 @@ function confirmPayment(status){
     date: Date.now()
   };
 
-  billRef.set(billData).then(()=>{
+  db.ref(basePath + '/counters/bill').transaction(c=> (c||0) + 1).then(res=>{
+    billData.billNo = 'B' + String(res.snapshot.val()).padStart(6,'0');
+    return billRef.set(billData);
+  }).then(()=>{
     // decrement stock for each item, and log the movement for stock.html's history tab
     const promises = sale.items.map(it=>{
       return db.ref(`${basePath}/products/${it.productId}/stock`).transaction(cur=> Math.max(0, (cur||0) - it.qty))
@@ -238,22 +247,93 @@ function confirmPayment(status){
 }
 
 function showSuccess(bill){
+  lastBill = bill;
   app.innerHTML = `
     <div class="wrap">
       <div class="success-screen">
         <div class="success-icon">✅</div>
         <h1 style="font-family:'Kanit'">ชำระเงินสำเร็จ</h1>
         <div class="card" style="text-align:left; margin-top:16px;">
+          <div class="bill-line"><span>เลขที่บิล</span><span><b>${bill.billNo}</b></span></div>
           <div class="bill-line"><span>ยอดชำระ</span><span>฿${bill.total.toLocaleString()}</span></div>
           <div class="bill-line"><span>วิธีชำระ</span><span>${ {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'}[bill.paymentMethod] }</span></div>
           ${bill.paymentMethod==='cash' ? `<div class="bill-line"><span>รับเงิน</span><span>฿${bill.cashReceived.toLocaleString()}</span></div>
           <div class="bill-line"><span>เงินทอน</span><span>฿${bill.change.toLocaleString()}</span></div>` : ''}
         </div>
-        <button class="btn" onclick="location.href='sell.html'">🛒 ขายรายการถัดไป</button>
+        <button class="btn outline" onclick="printReceiptNow()">🖨️ พิมพ์ใบเสร็จ</button>
+        <button class="btn" onclick="location.href=(sale && sale.returnTo) || 'sell.html'">🛒 ขายรายการถัดไป</button>
         <button class="btn outline" onclick="location.href='dashboard.html'">กลับไป Dashboard</button>
       </div>
     </div>
   `;
+}
+
+let lastBill = null;
+/* ===== เอกสาร: ใบเสร็จ / ใบกำกับภาษี (ใช้ร่วมกัน) ===== */
+function escH(t){ return String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function thMoney(n){ return (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function docNoOf(b, id){ return b.billNo || ('เก่า-' + String(id||'').slice(-6).toUpperCase()); }
+const DEFAULT_DESIGN = { paper:'a4', title:'ใบกำกับภาษี / ใบเสร็จรับเงิน', branchText:'สำนักงานใหญ่', showLogo:true, showAddress:true, showPhone:true, showBranch:true, showUnitPrice:true, showDiscount:true, showSignature:true, showCopyLabel:true, accent:'#1d4ed8', footer:'' };
+
+function receiptHTML(S, b, id){
+  const mL = {cash:'เงินสด',transfer:'โอนเงิน',qr:'QR Payment',other:'อื่นๆ'};
+  const vr = S.vatRate ?? 7;
+  const vatLine = S.taxInvoiceEnabled ? `<div class="pline"><span>VAT ${vr}%</span><span>฿${(b.total - b.total/(1+vr/100)).toLocaleString(undefined,{maximumFractionDigits:2})}</span></div>` : '';
+  return `
+    ${S.logoUrl ? `<img src="${escH(S.logoUrl)}" style="max-width:80px; display:block; margin:0 auto 6px;">` : ''}
+    <h2>${escH(S.shopName||'ร้านค้า')}</h2>
+    ${S.address ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">${escH(S.address)}</div>` : ''}
+    ${S.phone ? `<div style="text-align:center; font-size:10.5px; margin-bottom:4px;">โทร. ${escH(S.phone)}</div>` : ''}
+    ${S.taxId ? `<div style="text-align:center; font-size:10.5px; margin-bottom:8px;">เลขผู้เสียภาษี ${escH(S.taxId)}</div>` : ''}
+    <div style="text-align:center; font-family:'Kanit'; font-weight:bold; margin-bottom:6px;">ใบเสร็จรับเงิน${S.taxInvoiceEnabled ? ' / ใบกำกับภาษี' : ''}</div>
+    <div class="pline"><span>เลขที่บิล</span><span><b>${escH(docNoOf(b,id))}</b></span></div>
+    <div class="pline"><span>วันที่</span><span>${new Date(b.date).toLocaleString('th-TH')}</span></div>
+    <div class="pline"><span>พนักงาน</span><span>${escH(b.staffName)}</span></div>
+    <div style="margin:8px 0; border-top:1px dashed #000;"></div>
+    ${(b.items||[]).map(it=>`<div class="pline"><span>${escH(it.name)} x${it.qty}</span><span>฿${(it.price*it.qty-(it.discount||0)).toLocaleString()}</span></div>`).join('')}
+    <div class="pline ptotal"><span>ยอดสุทธิ</span><span>฿${b.total.toLocaleString()}</span></div>
+    ${vatLine}
+    <div class="pline"><span>ชำระโดย</span><span>${mL[b.paymentMethod]||'-'}</span></div>
+    ${S.receiptFooter ? `<div style="text-align:center; font-size:10.5px; margin-top:10px; border-top:1px dashed #000; padding-top:6px;">${escH(S.receiptFooter)}</div>` : ''}`;
+}
+
+function renderInvoiceHTML(D, S, b, id, buyer){
+  D = Object.assign({}, DEFAULT_DESIGN, D || {}); buyer = buyer || {}; S = S || {};
+  const slip = D.paper !== 'a4';
+  const width = D.paper === 'a4' ? '700px' : (D.paper === '80' ? '300px' : '220px');
+  const vr = Number(S.vatRate ?? 7) || 0;
+  const total = Number(b.total) || 0, base = total/(1+vr/100), vat = total - base;
+  const col = D.accent || '#1d4ed8', fs = slip ? 11 : 13;
+  const dots = '................................';
+  const head = `<div style="text-align:center">${D.showLogo && S.logoUrl ? `<img src="${escH(S.logoUrl)}" style="max-height:${slip?50:70}px;margin-bottom:4px"><br>` : ''}
+    <b style="font-size:${slip?14:18}px;font-family:Kanit">${escH(S.shopName||'ร้านค้า')}</b>
+    ${D.showAddress && S.address ? `<div>${escH(S.address)}</div>` : ''}${D.showPhone && S.phone ? `<div>โทร. ${escH(S.phone)}</div>` : ''}
+    <div>เลขประจำตัวผู้เสียภาษี ${escH(S.taxId||'-')}${D.showBranch && D.branchText ? ' · ' + escH(D.branchText) : ''}</div></div>`;
+  const title = `<div style="margin:8px 0;padding:6px;background:${col};color:#fff;text-align:center;font-family:Kanit;font-size:${slip?13:16}px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${escH(D.title)}${D.showCopyLabel ? ' (ต้นฉบับ)' : ''}</div>`;
+  const meta = `<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px"><span>เลขที่ <b>${escH(docNoOf(b,id))}</b></span><span>วันที่ ${new Date(b.date).toLocaleString('th-TH')}</span></div>`;
+  const buyerBox = `<div style="border:1px solid #999;padding:6px;margin:6px 0"><div>ผู้ซื้อ: ${buyer.name ? escH(buyer.name) : dots}</div><div>ที่อยู่: ${buyer.address ? escH(buyer.address) : dots}</div><div>เลขประจำตัวผู้เสียภาษี: ${buyer.taxId ? escH(buyer.taxId) : dots}</div></div>`;
+  const showUnit = !slip && D.showUnitPrice, showDisc = !slip && D.showDiscount;
+  const rows = (b.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${escH(it.name)}</td><td style="text-align:right">${it.qty}</td>${showUnit?`<td style="text-align:right">${thMoney(it.price)}</td>`:''}${showDisc?`<td style="text-align:right">${thMoney(it.discount||0)}</td>`:''}<td style="text-align:right">${thMoney(it.price*it.qty-(it.discount||0))}</td></tr>`).join('');
+  const table = `<style>.inv td,.inv th{border-bottom:1px solid #ddd;padding:3px}</style><table class="inv" style="width:100%;border-collapse:collapse;font-size:${fs}px"><tr style="background:#eee"><th>#</th><th style="text-align:left">รายการ</th><th>จำนวน</th>${showUnit?'<th>ราคา/หน่วย</th>':''}${showDisc?'<th>ส่วนลด</th>':''}<th>รวม</th></tr>${rows}</table>`;
+  const r2 = (l,v)=>`<div style="display:flex;justify-content:space-between"><span>${l}</span><span>${v}</span></div>`;
+  const bd = Number(b.billDiscount) || 0;
+  const totals = `<div style="margin-top:8px;margin-left:auto;width:${slip?'100%':'55%'}">${bd?r2('ส่วนลดบิล','-'+thMoney(bd)):''}${r2('มูลค่าสินค้า (ก่อนภาษี)',thMoney(base))}${r2('ภาษีมูลค่าเพิ่ม '+vr+'%',thMoney(vat))}
+    <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:${fs+3}px;border-top:2px solid #000;margin-top:4px;padding-top:4px"><span>รวมทั้งสิ้น</span><span>${thMoney(total)}</span></div>
+    <div style="font-size:${fs-2}px;color:#555">ราคารวมภาษีมูลค่าเพิ่มแล้ว</div></div>`;
+  const sign = D.showSignature ? `<div style="display:flex;justify-content:space-around;margin-top:${slip?16:36}px;text-align:center;font-size:${fs}px"><div>..............................<br>ผู้รับเงิน</div><div>..............................<br>ผู้ซื้อ</div></div>` : '';
+  const foot = D.footer ? `<div style="text-align:center;font-size:${fs-1}px;margin-top:10px;border-top:1px dashed #000;padding-top:6px">${escH(D.footer)}</div>` : '';
+  return { width, html: `<div style="font-family:Sarabun,sans-serif;font-size:${fs}px;color:#000;background:#fff">${head}${title}${meta}${buyerBox}${table}${totals}${sign}${foot}</div>` };
+}
+
+function printReceiptNow(){
+  const base = `shops/${sale.shopId}/branches/${sale.branchId}`;
+  db.ref(base + '/settings').once('value').then(sn=>{
+    const S = sn.val() || {};
+    const area = document.getElementById('printArea');
+    area.style.width = S.paperWidth === '80' ? '300px' : '220px';
+    area.innerHTML = receiptHTML(S, lastBill, '');
+    setTimeout(()=> window.print(), 300);
+  });
 }
 </script>
 </body>
