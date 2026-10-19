@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>เมนูร้านน้ำปั่น</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{ --bg1:#0f172a; --bg2:#1e293b; --card:#1e293b; --accent:#3b82f6; --text:#f1f5f9; --sub:#94a3b8; --danger:#ef4444; --ok:#22c55e; --warn:#fbbf24; --border:#334155; --drink:#14b8a6; }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ font-family:'Sarabun',sans-serif; background:linear-gradient(160deg,var(--bg1),var(--bg2)); min-height:100vh; color:var(--text); padding:16px; padding-bottom:60px; }
+  .wrap{ max-width:560px; margin:0 auto; }
+  @media (min-width:900px){ .wrap{ max-width:900px; } }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .topbar h1{ font-family:'Kanit'; font-size:19px; } .back-link{ color:var(--accent); font-size:13px; cursor:pointer; }
+  .where{ font-size:13px; color:var(--sub); margin-bottom:14px; }
+  .notice{ background:#fbbf2418; border:1px solid #fbbf2455; color:var(--warn); border-radius:12px; padding:9px 12px; font-size:12.5px; margin-bottom:12px; }
+  .kpis{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px; }
+  @media (min-width:900px){ .kpis{ grid-template-columns:repeat(4,1fr); } }
+  .kpi{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px 14px; }
+  .kpi .v{ font-family:'Kanit'; font-size:21px; color:#5eead4; } .kpi .l{ font-size:12px; color:var(--sub); margin-top:2px; }
+  .sec{ font-family:'Kanit'; font-size:14.5px; margin:16px 2px 8px; }
+  .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  @media (min-width:900px){ .grid{ grid-template-columns:repeat(4,1fr); } }
+  .tile{ display:block; text-decoration:none; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px; min-height:92px; }
+  .tile:active{ border-color:var(--drink); }
+  .tile .ic{ font-size:24px; } .tile .nm{ font-family:'Kanit'; font-size:14px; margin-top:4px; } .tile .ds{ font-size:11.5px; color:var(--sub); margin-top:2px; }
+  .tile.soon{ border-style:dashed; opacity:.65; cursor:default; }
+  .tile .tag{ display:inline-block; font-size:10.5px; background:#fbbf2422; color:var(--warn); padding:1px 8px; border-radius:10px; margin-top:4px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDmWjzmkCTjih7G1smod3-B8pR5OMxxud0",
+  authDomain: "multi-shop-system.firebaseapp.com",
+  databaseURL: "https://multi-shop-system-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "multi-shop-system",
+  storageBucket: "multi-shop-system.firebasestorage.app",
+  messagingSenderId: "99369473058",
+  appId: "1:99369473058:web:07bd5fbc308f79f18ee67b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const app = document.getElementById('app');
+let session = null, cb = null;
+try{ session = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
+try{ cb = JSON.parse(localStorage.getItem('currentShopBranch')); }catch(e){}
+const esc = t => String(t==null?'':t).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+if(!session){
+  app.innerHTML = `<div style="text-align:center;padding:60px 20px"><h1>ยังไม่ได้เข้าสู่ระบบ</h1><br><a href="login.html" style="color:#3b82f6">ไปหน้าเข้าสู่ระบบ</a></div>`;
+} else if(!cb || !cb.shopId || !cb.branchId){
+  app.innerHTML = `<div style="text-align:center;padding:60px 20px"><h1>ยังไม่ได้เลือกสาขา</h1><br><a href="home.html" style="color:#3b82f6">ไปหน้าหลักเพื่อเลือกสาขา</a></div>`;
+} else {
+  start();
+}
+
+function start(){
+  const isAdmin = session.role === 'admin', perms = session.permissions || {};
+  const SEC = [
+    { t:'🛒 ขายและออเดอร์', items:[
+      { href:'sell.html', ic:'🛒', nm:'ขายเครื่องดื่ม', ds:'เปิดหน้าขาย เลือกเมนู/ขนาด/ท็อปปิ้ง', show: isAdmin || perms.sell },
+      { soon:true, ic:'🧾', nm:'รับออเดอร์ + คิวทำ', ds:'คิวเครื่องดื่มที่ต้องทำ' } ] },
+    { t:'🥤 เมนูและสูตร', items:[
+      { href:'products.html', ic:'📋', nm:'เมนูเครื่องดื่ม', ds:'ดู/ค้นหาเมนูทั้งหมด', show:true },
+      { href:'addproduct.html', ic:'➕', nm:'เพิ่มเมนูใหม่', ds:'ตั้งราคา ขนาด ความหวาน ท็อปปิ้ง', show: isAdmin || perms.addProduct },
+      { soon:true, ic:'🧪', nm:'สูตรเครื่องดื่ม', ds:'ตัดสต็อกวัตถุดิบตามสูตร' },
+      { href:'promotions.html', ic:'🔥', nm:'โปรโมชั่น', ds:'ลดราคาเมนู', show: isAdmin || perms.editPrice },
+      { href:'pricetag.html', ic:'🏷️', nm:'ป้ายราคา / ป้ายเมนู', ds:'พิมพ์ป้ายและบาร์โค้ด', show: isAdmin || perms.addProduct } ] },
+    { t:'🧊 วัตถุดิบและสต็อก', items:[
+      { href:'stock.html', ic:'📊', nm:'สต็อก', ds:'ดูของคงเหลือ ใกล้หมด', show:true },
+      { href:'receive.html', ic:'📥', nm:'รับของเข้าร้าน', ds:'รับวัตถุดิบ/ของเข้าร้าน', show: isAdmin || perms.addProduct } ] },
+    { t:'📈 บัญชีและรายงาน', items:[
+      { href:'sales.html', ic:'🧾', nm:'รายการขาย', ds:'บิล เลขที่บิล ใบเสร็จ', show:true },
+      { href:'debtors.html', ic:'📒', nm:'ลูกหนี้', ds:'ชำระหนี้ วงเงิน ประวัติ', show:true },
+      { href:'reports.html', ic:'📈', nm:'รายงาน', ds:'ยอดขาย กำไร ขายดี', show: isAdmin || perms.viewReport },
+      { href:'dashboard.html', ic:'🏠', nm:'Dashboard', ds:'ภาพรวมวันนี้', show:true } ] }
+  ];
+  app.innerHTML = `
+    <div class="topbar"><h1>🥤 เมนูร้านน้ำปั่น</h1><span class="back-link" onclick="location.href='home.html'">← หน้าหลัก</span></div>
+    <div class="where" id="where">กำลังโหลด...</div>
+    <div id="notice"></div>
+    <div class="kpis">
+      <div class="kpi"><div class="v" id="kSales">-</div><div class="l">ยอดขายวันนี้</div></div>
+      <div class="kpi"><div class="v" id="kBills">-</div><div class="l">จำนวนบิลวันนี้</div></div>
+      <div class="kpi"><div class="v" id="kCups">-</div><div class="l">จำนวนแก้ว/ชิ้นที่ขาย</div></div>
+      <a class="kpi" href="stock.html" style="text-decoration:none;color:inherit"><div class="v" id="kLow" style="color:#fbbf24">-</div><div class="l">สินค้าใกล้หมด/หมด</div></a>
+    </div>
+    ${SEC.map(s=>`<div class="sec">${s.t}</div><div class="grid">${s.items.filter(i=>i.soon||i.show).map(i=> i.soon
+      ? `<div class="tile soon"><div class="ic">${i.ic}</div><div class="nm">${i.nm}</div><div class="ds">${i.ds}</div><span class="tag">เร็วๆ นี้</span></div>`
+      : `<a class="tile" href="${i.href}"><div class="ic">${i.ic}</div><div class="nm">${i.nm}</div><div class="ds">${i.ds}</div></a>`).join('')}</div>`).join('')}
+  `;
+
+  const base = `shops/${cb.shopId}/branches/${cb.branchId}`;
+  db.ref('shops/' + cb.shopId).once('value').then(sn=>{
+    const s = sn.val() || {}, b = (s.branches||{})[cb.branchId] || {};
+    document.getElementById('where').textContent = '📍 ' + ((s.info||{}).name || '') + ' · ' + (b.name || '');
+    if((s.info||{}).type && s.info.type !== 'ร้านน้ำปั่น')
+      document.getElementById('notice').innerHTML = `<div class="notice">ร้านนี้เป็นประเภท "${esc(s.info.type)}" — เมนูนี้ออกแบบสำหรับร้านน้ำปั่น</div>`;
+  });
+  const t0 = new Date(); t0.setHours(0,0,0,0);
+  db.ref(base + '/bills').orderByChild('date').startAt(t0.getTime()).once('value').then(sn=>{
+    let sales = 0, n = 0, cups = 0;
+    Object.values(sn.val() || {}).forEach(b=>{
+      if(b.status === 'cancelled' || b.status === 'returned') return;
+      n++; sales += b.total || 0; (b.items||[]).forEach(it=>{ cups += it.qty || 0; });
+    });
+    document.getElementById('kSales').textContent = '฿' + sales.toLocaleString();
+    document.getElementById('kBills').textContent = n; document.getElementById('kCups').textContent = cups;
+  });
+  db.ref(base + '/products').once('value').then(sn=>{
+    let low = 0; Object.values(sn.val() || {}).forEach(p=>{ if((p.stock||0) <= (p.reorderPoint ?? 0)) low++; });
+    document.getElementById('kLow').textContent = low;
+  });
+}
+</script>
+<script>
+/* ===== สิทธิ์ใช้เมนูรายหัวข้อ (users/{uid}/menus) — ตั้งค่าที่หน้าพนักงาน ===== */
+(function(){
+  var PAGE_KEY = null;
+  var MAP = {"dashboard.html": "dashboard", "sell.html": "sell", "products.html": "products", "stock.html": "stock", "receive.html": "receive", "pricetag.html": "pricetag", "promotions.html": "promotions", "sales.html": "sales", "debtors.html": "debtors", "reports.html": "reports", "addproduct.html": "addproduct", "settings.html": "settings"};
+  var ALL = ['dashboard','sell','products','stock','stockAdjust','receive','pricetag','promotions','sales','debtors','reports','addproduct','settings'];
+  var s = null; try{ s = JSON.parse(localStorage.getItem('shopSession')); }catch(e){}
+  if(!s || !s.uid || s.role === 'admin') return;
+  try{
+    firebase.database().ref('users/' + s.uid).once('value').then(function(sn){
+      var u = sn.val(); if(!u) return;
+      var menus = u.menus || null, oldDeny = u.deny || {};
+      if(menus){
+        var p = Object.assign({}, u.permissions || {});
+        p.sell = !!menus.sell; p.addProduct = !!(menus.addproduct || menus.receive || menus.pricetag);
+        p.editPrice = !!menus.promotions; p.viewReport = !!(menus.reports || menus.sales); p.manageSystem = !!menus.settings;
+        var need = JSON.stringify(p) !== JSON.stringify(s.permissions || {});
+        if(need && !sessionStorage.getItem('menuSyncDone')){
+          s.permissions = p; localStorage.setItem('shopSession', JSON.stringify(s));
+          sessionStorage.setItem('menuSyncDone', '1'); location.reload(); return;
+        }
+        if(!need) sessionStorage.removeItem('menuSyncDone');
+      }
+      function blocked(k){ return menus ? !menus[k] : !!oldDeny[k]; }
+      var deny = {}; ALL.forEach(function(k){ deny[k] = blocked(k); });
+      window.__deny = deny;
+      if(deny.stockAdjust){ var st = document.createElement('style'); st.textContent = '.adj-btn{display:none !important}'; document.head.appendChild(st); }
+      function hide(){
+        document.querySelectorAll('a[href], [data-href]').forEach(function(el){
+          var h = el.getAttribute('href') || el.getAttribute('data-href'); var k = MAP[h];
+          if(k && deny[k]) el.style.display = 'none';
+        });
+      }
+      hide(); new MutationObserver(hide).observe(document.body, {childList:true, subtree:true});
+      if(PAGE_KEY && deny[PAGE_KEY]){
+        document.body.innerHTML = '<div style="text-align:center;padding:80px 20px;font-family:Sarabun,sans-serif;color:#f1f5f9"><h2>🚫 ไม่มีสิทธิ์ใช้เมนูนี้</h2><p style="color:#94a3b8;margin-top:8px">กำลังกลับหน้าหลัก...</p></div>';
+        setTimeout(function(){ location.href = 'home.html'; }, 1500);
+      }
+    });
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

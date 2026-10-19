@@ -227,6 +227,7 @@ function renderActionStep(){
     : `<span class="back-link" id="backToShop2">← เปลี่ยนร้าน</span>`;
 
   const actions = [
+    { href:'drinkshop.html', icon:'🥤', label:'เมนูร้านน้ำปั่น', show: (shop.info && shop.info.type === 'ร้านน้ำปั่น') },
     { href:'dashboard.html', icon:'🏠', label:'Dashboard', show:true },
     { href:'sell.html', icon:'🛒', label:'ขายสินค้า', show: isAdmin || perms.sell },
     { href:'products.html', icon:'📦', label:'สินค้า', show:true },
